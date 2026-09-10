@@ -4,7 +4,7 @@
 
 [English](README.md) · [Français](README.fr.md)
 
-[![Release](https://img.shields.io/github/v/release/ergocogn/hermes-desktop-plugin-vault-view?display_name=tag&sort=semver)](https://github.com/ergocogn/hermes-desktop-plugin-vault-view/releases/latest)
+[![Release v0.4.3](https://img.shields.io/badge/release-v0.4.3-2563eb)](https://github.com/ergocogn/hermes-desktop-plugin-vault-view/releases/tag/v0.4.3)
 [![Install in Hermes Desktop](https://img.shields.io/badge/Install%20in-Hermes%20Desktop-2563eb)](hermes://plugin/install?repo=ergocogn/hermes-desktop-plugin-vault-view)
 
 ![Vault View displaying a linked Markdown note, explorer, outline, and graph inside Hermes Desktop](screenshots/vault-view-light.png)
