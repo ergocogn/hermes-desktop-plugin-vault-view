@@ -4,6 +4,9 @@
 
 [English](README.md) · [Français](README.fr.md)
 
+[![Release](https://img.shields.io/github/v/release/ergocogn/hermes-desktop-plugin-vault-view?display_name=tag&sort=semver)](https://github.com/ergocogn/hermes-desktop-plugin-vault-view/releases/latest)
+[![Install in Hermes Desktop](https://img.shields.io/badge/Install%20in-Hermes%20Desktop-2563eb)](hermes://plugin/install?repo=ergocogn/hermes-desktop-plugin-vault-view)
+
 ![Vault View displaying a linked Markdown note, explorer, outline, and graph inside Hermes Desktop](screenshots/vault-view-light.png)
 
 Vault View brings your Markdown knowledge base into the conversation. Find a note, ask Hermes to create or update it, follow its links, and keep several notes open in a workspace designed for a vault—not a generic file preview.
@@ -35,6 +38,16 @@ The Hermes agent keeps using its existing Obsidian CLI integration for note oper
 ## Installation
 
 Vault View is a standalone Hermes Desktop Plugin. It requires no build step, npm package, or Python component.
+
+### One-click installation
+
+Open this page on the computer running Hermes Desktop, then select **Install in Hermes Desktop**:
+
+[**Install Vault View in Hermes Desktop**](hermes://plugin/install?repo=ergocogn/hermes-desktop-plugin-vault-view)
+
+Hermes asks for confirmation before installing. If the link is not available in your Hermes Desktop version, use the manual installation below.
+
+### Manual installation
 
 1. Copy this repository into the active Hermes Desktop plugin directory as `vault-view`.
 2. Confirm that the entry point is `$HERMES_HOME/desktop-plugins/vault-view/plugin.js`.
