@@ -1,0 +1,59 @@
+name: Bug report
+description: Report a reproducible Vault View problem
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: Do not include private vault paths, note contents, credentials, tokens, environment values, or client data. Report vulnerabilities through GitHub private vulnerability reporting instead.
+  - type: input
+    id: vault_view_version
+    attributes:
+      label: Vault View version
+      placeholder: 0.4.3
+    validations:
+      required: true
+  - type: input
+    id: hermes_version
+    attributes:
+      label: Hermes Desktop version
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Operating system and Hermes backend
+      placeholder: Windows 11 with WSL backend, macOS, or Linux
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: dropdown
+    id: theme
+    attributes:
+      label: Theme
+      options:
+        - Light
+        - Dark
+        - Both
+        - Not applicable
+    validations:
+      required: true
+
