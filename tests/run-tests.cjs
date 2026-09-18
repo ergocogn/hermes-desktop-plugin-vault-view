@@ -10,7 +10,7 @@ source = source.replace(
   '\nexport default {',
   `
 globalThis.__vaultViewTest = {
-  ID, VERSION, attachVaultCapabilitiesToDraft, compactVaultContext, detectConfiguredVaultPath, findAgentNoteMatches, installVaultContextPresentation, isVaultRelevantRequest, validDetectedPath,
+  ID, VERSION, attachVaultCapabilitiesToDraft, compactVaultContext, detectConfiguredVaultPath, findAgentNoteMatches, installVaultContextPresentation, isVaultRelevantRequest, renderImage, resolveImagePath, validDetectedPath,
   setRuntime: function(ctx, session) { pluginCtx = ctx; vaultSessionContext = session }
 }
 globalThis.__vaultViewPlugin = {`
@@ -63,7 +63,7 @@ vm.runInNewContext(source, sandbox, { filename: pluginPath })
 
 const api = sandbox.__vaultViewTest
 assert.equal(api.ID, 'vault-view')
-assert.equal(api.VERSION, '0.4.3')
+assert.equal(api.VERSION, '0.4.4')
 assert.equal(api.validDetectedPath('/vault/'), '/vault')
 assert.equal(api.validDetectedPath('/vault\nsecret'), '')
 
@@ -80,6 +80,14 @@ assert.deepEqual(Array.from(api.findAgentNoteMatches('Été', files, root)), ['/
 assert.deepEqual(Array.from(api.findAgentNoteMatches('Alpha', files, root)), ['/vault/Projects/Alpha.md', '/vault/Archive/Alpha.md'])
 assert.deepEqual(Array.from(api.findAgentNoteMatches('Bet', files, root)), [])
 assert.deepEqual(Array.from(api.findAgentNoteMatches('/vault/Projects/Alpha.md', files, root)), ['/vault/Projects/Alpha.md'])
+
+const imageAssets = ['/vault/Attachments/inside.png']
+assert.equal(api.resolveImagePath('../../outside.png', '/vault/Notes/Meeting.md', root, imageAssets), null)
+assert.equal(api.resolveImagePath('../../../etc/passwd', '/vault/Notes/Meeting.md', root, imageAssets), null)
+assert.equal(api.resolveImagePath('../Attachments/inside.png', '/vault/Notes/Meeting.md', root, imageAssets), '/vault/Attachments/inside.png')
+const traversalImage = api.renderImage('outside', '../../outside.png', '/vault/Notes/Meeting.md', root, imageAssets, '', false)
+assert.doesNotMatch(traversalImage, /data-local-path=/)
+assert.doesNotMatch(traversalImage, /(?:^|\s)src=["'][^"']*(?:outside\.png|etc\/passwd)/)
 
 api.setRuntime(null, { activePath: '', shareWithAgent: false })
 assert.equal(api.isVaultRelevantRequest('Peux-tu reformater ce fichier Markdown ?', root), false)

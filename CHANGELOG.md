@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.4 - 2026-09-18
+
+### Security
+
+- Keep local image resolution and reads inside the selected vault. Unresolved or traversal references are no longer emitted as readable local paths, canonical paths are checked again before reading, and asset scans no longer follow symbolic links.
+
 ## 0.4.3 - 2026-09-10
 
 First public-ready release of Vault View.

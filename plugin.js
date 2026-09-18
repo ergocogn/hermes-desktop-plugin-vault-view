@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 const ID = 'vault-view'
 const NAME = 'Vault View'
 const VAULT_TAB_ICON_CSS = '[data-tree-tab^="plugin-workspace:vault-view:"]::before{content:"\\ea7b";font-family:codicon;font-size:13px;font-style:normal;font-weight:normal;flex-shrink:0;color:var(--ui-text-tertiary);margin-right:4px;}'
-const VERSION = '0.4.3'
+const VERSION = '0.4.4'
 const VAULT_PATH_DEFAULT = ''
 const VAULT_ENV_KEY = 'WIKI_PATH'
 const STORAGE_VAULT_PATH = ID + ':vault-path'
@@ -431,7 +431,7 @@ async function collectCommandLines(command, manifestPath) {
 async function scanVaultFiles(path) {
   const root = normalizePath(path || VAULT_PATH_DEFAULT)
   const quotedRoot = shellQuote(root)
-  const findCommand = "find -L " + quotedRoot + " \\( -type d \\( -name '.obsidian' -o -name 'node_modules' -o -name '.trash' \\) -prune \\) -o -type f -name '*.md' -print"
+  const findCommand = "find -P " + quotedRoot + " \\( -type d \\( -name '.obsidian' -o -name 'node_modules' -o -name '.trash' \\) -prune \\) -o -type f -name '*.md' -print"
   try {
     const files = (await collectCommandLines(findCommand, '/tmp/hermes-vault-view-notes.txt')).filter(function(line) {
       return line.endsWith('.md') && !isIgnoredPath(line)
@@ -445,13 +445,14 @@ async function scanVaultFiles(path) {
         'root = sys.argv[1]',
         'out = []',
         'seen = set()',
-        'for base, dirs, files in os.walk(root, followlinks=True):',
+        'for base, dirs, files in os.walk(root, followlinks=False):',
         '    real = os.path.realpath(base)',
         '    if real in seen: dirs[:] = []; continue',
         '    seen.add(real)',
-        "    dirs[:] = [d for d in dirs if d not in ('.obsidian', 'node_modules', '.trash')]",
+        "    dirs[:] = [d for d in dirs if d not in ('.obsidian', 'node_modules', '.trash') and not os.path.islink(os.path.join(base, d))]",
         '    for name in files:',
-        "        if name.lower().endswith('.md'): out.append(os.path.join(base, name))",
+        "        full = os.path.join(base, name)",
+        "        if name.lower().endswith('.md') and not os.path.islink(full): out.append(full)",
         "print('\\n'.join(sorted(p.replace(os.sep, '/') for p in out)))",
       ].join('\n')
       const files = (await collectCommandLines('python3 -c ' + shellQuote(script) + ' ' + quotedRoot, '/tmp/hermes-vault-view-notes.txt')).filter(function(line) {
@@ -471,8 +472,10 @@ async function scanVaultEntries(path) {
   const root = normalizePath(path || VAULT_PATH_DEFAULT)
   const rootWithoutTrailingSlash = root.replace(/\/+$/, '')
   const quotedRoot = shellQuote(root)
-  const directoryCommand = "find -L " + quotedRoot + " \\( -type d \\( -name '.obsidian' -o -name 'node_modules' -o -name '.trash' \\) -prune \\) -o -type d -print"
-  const fileCommand = "find -L " + quotedRoot + " \\( -type d \\( -name '.obsidian' -o -name 'node_modules' -o -name '.trash' \\) -prune \\) -o -type f -print"
+  // Never follow links while building the read allow-list. A path that looks
+  // like a vault child but resolves through a symlink must not become readable.
+  const directoryCommand = "find -P " + quotedRoot + " \\( -type d \\( -name '.obsidian' -o -name 'node_modules' -o -name '.trash' \\) -prune \\) -o -type d -print"
+  const fileCommand = "find -P " + quotedRoot + " \\( -type d \\( -name '.obsidian' -o -name 'node_modules' -o -name '.trash' \\) -prune \\) -o -type f -print"
   function parsePaths(paths, type) {
     return paths.map(normalizePath).filter(function(entryPath) {
       return entryPath && entryPath.replace(/\/+$/, '') !== rootWithoutTrailingSlash && !isIgnoredPath(entryPath)
@@ -492,13 +495,13 @@ async function scanVaultEntries(path) {
         'root = sys.argv[1]',
         'out = []',
         'seen = set()',
-        'for base, dirs, files in os.walk(root, followlinks=True):',
+        'for base, dirs, files in os.walk(root, followlinks=False):',
         '    real = os.path.realpath(base)',
         '    if real in seen: dirs[:] = []; continue',
         '    seen.add(real)',
-        "    dirs[:] = [d for d in dirs if d not in ('.obsidian', 'node_modules', '.trash')]",
+        "    dirs[:] = [d for d in dirs if d not in ('.obsidian', 'node_modules', '.trash') and not os.path.islink(os.path.join(base, d))]",
         "    out.extend('d\\t' + os.path.join(base, name).replace(os.sep, '/') for name in dirs)",
-        "    out.extend('f\\t' + os.path.join(base, name).replace(os.sep, '/') for name in files)",
+        "    out.extend('f\\t' + os.path.join(base, name).replace(os.sep, '/') for name in files if not os.path.islink(os.path.join(base, name)))",
         "print('\\n'.join(sorted(out)))",
       ].join('\n')
       const manifest = await collectCommandLines('python3 -c ' + shellQuote(script) + ' ' + quotedRoot, '/tmp/hermes-vault-view-entries.txt')
@@ -1625,6 +1628,17 @@ function normalizeAbsolutePath(path) {
   return prefix === '/' ? '/' + stack.join('/') : prefix + '/' + stack.join('/')
 }
 
+function isPathInsideVault(path, vaultPath) {
+  const root = normalizeAbsolutePath(vaultPath).replace(/\/+$/, '') || '/'
+  const candidate = normalizeAbsolutePath(path)
+  if (/^[A-Za-z]:\//.test(root)) {
+    const lowerRoot = root.toLowerCase()
+    const lowerCandidate = candidate.toLowerCase()
+    return lowerCandidate === lowerRoot || lowerCandidate.startsWith(lowerRoot + '/')
+  }
+  return candidate === root || candidate.startsWith(root === '/' ? '/' : root + '/')
+}
+
 function resolveImagePath(src, currentPath, vaultPath, allAssets) {
   const clean = cleanMarkdownTarget(src)
   if (!clean || isExternalUrl(clean)) return null
@@ -1644,18 +1658,21 @@ function resolveImagePath(src, currentPath, vaultPath, allAssets) {
   candidates.push(normalizeAbsolutePath(joinPath(root, clean)))
   const lowerAssets = new Map(assets.map(function(path) { return [normalizePath(path).toLowerCase(), path] }))
   for (const candidate of candidates) {
+    if (!isPathInsideVault(candidate, root)) continue
     const exact = lowerAssets.get(candidate.toLowerCase())
-    if (exact) return exact
+    if (exact && isPathInsideVault(exact, root)) return exact
   }
   const relativeName = normalizePath(clean).replace(/^\/+/, '').toLowerCase()
   const byRelativePath = assets.find(function(path) {
     return normalizePath(path).toLowerCase().endsWith('/' + relativeName)
   })
-  if (byRelativePath) return byRelativePath
+  if (byRelativePath && isPathInsideVault(byRelativePath, root)) return byRelativePath
   const wantedName = basename(clean).toLowerCase()
   const byName = assets.find(function(path) { return basename(path).toLowerCase() === wantedName })
-  if (byName) return byName
-  return candidates[0] || null
+  if (byName && isPathInsideVault(byName, root)) return byName
+  // Local images are a strict allow-list: unresolved paths, traversal attempts,
+  // and paths outside the scanned vault must never reach the filesystem reader.
+  return null
 }
 
 function filePathToUrl(path) {
@@ -1680,26 +1697,39 @@ function imageMimeType(path) {
   return 'image/png'
 }
 
-async function loadImageDataUrl(path) {
+async function loadImageDataUrl(path, vaultPath) {
   const cleanPath = normalizePath(path)
-  if (imageDataCache.has(cleanPath)) return imageDataCache.get(cleanPath)
-  if (imageLoadPromises.has(cleanPath)) return imageLoadPromises.get(cleanPath)
-  const pending = readImageDataUrl(cleanPath)
-  imageLoadPromises.set(cleanPath, pending)
+  const cleanRoot = normalizePath(vaultPath)
+  const cacheKey = cleanRoot + '\u0000' + cleanPath
+  if (imageDataCache.has(cacheKey)) return imageDataCache.get(cacheKey)
+  if (imageLoadPromises.has(cacheKey)) return imageLoadPromises.get(cacheKey)
+  const pending = readImageDataUrl(cleanPath, cleanRoot)
+  imageLoadPromises.set(cacheKey, pending)
   try {
     const dataUrl = await pending
-    if (dataUrl) imageDataCache.set(cleanPath, dataUrl)
+    if (dataUrl) imageDataCache.set(cacheKey, dataUrl)
     return dataUrl
   } finally {
-    imageLoadPromises.delete(cleanPath)
+    imageLoadPromises.delete(cacheKey)
   }
 }
 
-async function readImageDataUrl(cleanPath) {
+async function canonicalVaultImagePath(cleanPath, vaultPath) {
+  if (!vaultPath || !isPathInsideVault(cleanPath, vaultPath)) return ''
+  const command = 'root=$(realpath -e -- ' + shellQuote(vaultPath) + ') && target=$(realpath -e -- ' + shellQuote(cleanPath) + ') && if [ "$root" = / ]; then printf "%s\\n%s" "$root" "$target"; else case "$target" in "$root"|"$root"/*) printf "%s\\n%s" "$root" "$target";; esac; fi'
+  const resolved = getStdout(await shellExec(command)).split(/\r?\n/).map(normalizePath)
+  const canonicalRoot = resolved[0] || ''
+  const canonicalPath = resolved[1] || ''
+  return canonicalRoot && canonicalPath && isPathInsideVault(canonicalPath, canonicalRoot) ? canonicalPath : ''
+}
+
+async function readImageDataUrl(cleanPath, vaultPath) {
   try {
-    const bytes = await readVaultFileBytes(cleanPath)
+    const canonicalPath = await canonicalVaultImagePath(cleanPath, vaultPath)
+    if (!canonicalPath) throw new Error('Image en dehors du vault ou introuvable')
+    const bytes = await readVaultFileBytes(canonicalPath)
     if (!bytes.length) throw new Error('Fichier image vide : ' + cleanPath)
-    return 'data:' + imageMimeType(cleanPath) + ';base64,' + encodeBase64Bytes(bytes)
+    return 'data:' + imageMimeType(canonicalPath) + ';base64,' + encodeBase64Bytes(bytes)
   } catch (error) {
     reportPluginError('image read failed', error)
     return ''
@@ -1715,7 +1745,10 @@ function renderImage(alt, src, currentPath, vaultPath, allAssets, sizeHint, wiki
   const size = String(sizeHint || '').match(/^(\d{1,4})(?:x(\d{1,4}))?$/)
   const width = size ? ' width="' + size[1] + '"' : ''
   const height = size && size[2] ? ' height="' + size[2] + '"' : ''
-  return '<img alt="' + escapeAttr(alt) + '" src="' + escapeAttr(filePathToUrl(path)) + '" data-local-path="' + escapeAttr(path) + '" data-markdown-src="' + escapeAttr(clean) + '"' + (wikiEmbed ? ' data-wiki-embed="true"' : '') + width + height + '>'
+  if (!path) {
+    return '<img alt="' + escapeAttr(alt) + '" data-markdown-src="' + escapeAttr(clean) + '"' + (wikiEmbed ? ' data-wiki-embed="true"' : '') + width + height + '>'
+  }
+  return '<img alt="' + escapeAttr(alt) + '" src="' + escapeAttr(filePathToUrl(path)) + '" data-local-path="' + escapeAttr(path) + '" data-vault-root="' + escapeAttr(normalizeAbsolutePath(vaultPath)) + '" data-markdown-src="' + escapeAttr(clean) + '"' + (wikiEmbed ? ' data-wiki-embed="true"' : '') + width + height + '>'
 }
 
 function renderInline(text, currentPath, vaultPath, allFiles, allAssets) {
@@ -2265,8 +2298,9 @@ function hydrateLocalImages(root) {
   const images = root ? Array.from(root.querySelectorAll('img[data-local-path]')) : []
   images.forEach(function(image) {
     const path = image.getAttribute('data-local-path')
+    const vaultPath = image.getAttribute('data-vault-root')
     if (!path || String(image.getAttribute('src') || '').startsWith('data:')) return
-    loadImageDataUrl(path).then(function(dataUrl) {
+    loadImageDataUrl(path, vaultPath).then(function(dataUrl) {
       if (dataUrl && image.isConnected) image.setAttribute('src', dataUrl)
     })
   })
@@ -5330,8 +5364,9 @@ function MarkdownView({ content, currentPath, vaultPath, allFiles, allAssets, he
     const images = root ? Array.from(root.querySelectorAll('img[data-local-path]')) : []
     images.forEach(function(image) {
       const path = image.getAttribute('data-local-path')
+      const vaultPath = image.getAttribute('data-vault-root')
       if (!path) return
-      loadImageDataUrl(path).then(function(dataUrl) {
+      loadImageDataUrl(path, vaultPath).then(function(dataUrl) {
         if (!cancelled && dataUrl) image.setAttribute('src', dataUrl)
       })
     })
