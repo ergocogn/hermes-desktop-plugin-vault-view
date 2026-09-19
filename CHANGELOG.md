@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.5 - 2026-09-19
+
+### Fixed
+
+- Use explicit macOS and Linux command variants when checking file revisions and resolving canonical image paths, so normal note reads and local image hydration work on both supported platforms.
+- Avoid GNU-only option separators in chunked file reads.
+
 ## 0.4.4 - 2026-09-18
 
 ### Security

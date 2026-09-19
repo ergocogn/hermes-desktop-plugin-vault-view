@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 const ID = 'vault-view'
 const NAME = 'Vault View'
 const VAULT_TAB_ICON_CSS = '[data-tree-tab^="plugin-workspace:vault-view:"]::before{content:"\\ea7b";font-family:codicon;font-size:13px;font-style:normal;font-weight:normal;flex-shrink:0;color:var(--ui-text-tertiary);margin-right:4px;}'
-const VERSION = '0.4.4'
+const VERSION = '0.4.5'
 const VAULT_PATH_DEFAULT = ''
 const VAULT_ENV_KEY = 'WIKI_PATH'
 const STORAGE_VAULT_PATH = ID + ':vault-path'
@@ -517,9 +517,14 @@ async function scanVaultEntries(path) {
   }
 }
 
+function fileRevisionCommand(path) {
+  const quotedPath = shellQuote(path)
+  return 'case "$(uname -s)" in Darwin) stat -L -f \'%z|%m|%c|%i\' ' + quotedPath + ';; *) stat -L -c \'%s|%Y|%Z|%i\' -- ' + quotedPath + ';; esac'
+}
+
 async function readVaultFileBytes(path) {
   const quotedPath = shellQuote(path)
-  const statCommand = "stat -L -c '%s|%y|%z|%i' -- " + quotedPath
+  const statCommand = fileRevisionCommand(path)
   const revision = getStdout(await shellExec(statCommand)).trim()
   const size = Number(revision.split('|')[0])
   if (!/^\d+\|.+/.test(revision) || !Number.isSafeInteger(size) || size < 0) {
@@ -532,7 +537,7 @@ async function readVaultFileBytes(path) {
   for (let offset = 0; offset < size; offset += chunkSize) {
     const expected = Math.min(chunkSize, size - offset)
     // Use read-only utilities; Hermes blocks dd and interpreter execution in shell.exec.
-    const command = 'tail -c +' + (offset + 1) + ' -- ' + quotedPath + ' | head -c ' + expected + ' | base64'
+    const command = 'tail -c +' + (offset + 1) + ' ' + quotedPath + ' | head -c ' + expected + ' | base64'
     const encoded = getStdout(await shellExec(command)).replace(/\s+/g, '')
     if (encoded.length !== 4 * Math.ceil(expected / 3) || !/^[A-Za-z0-9+/]*={0,2}$/.test(encoded)) {
       throw new Error('Lecture incomplète du fichier : ' + path)
@@ -1714,9 +1719,15 @@ async function loadImageDataUrl(path, vaultPath) {
   }
 }
 
+function canonicalPathCommand(cleanPath, vaultPath) {
+  const quotedRoot = shellQuote(vaultPath)
+  const quotedPath = shellQuote(cleanPath)
+  return 'case "$(uname -s)" in Darwin) root=$(realpath ' + quotedRoot + ') && target=$(realpath ' + quotedPath + ');; *) root=$(realpath -e -- ' + quotedRoot + ') && target=$(realpath -e -- ' + quotedPath + ');; esac && if [ "$root" = / ]; then printf "%s\\n%s" "$root" "$target"; else case "$target" in "$root"|"$root"/*) printf "%s\\n%s" "$root" "$target";; esac; fi'
+}
+
 async function canonicalVaultImagePath(cleanPath, vaultPath) {
   if (!vaultPath || !isPathInsideVault(cleanPath, vaultPath)) return ''
-  const command = 'root=$(realpath -e -- ' + shellQuote(vaultPath) + ') && target=$(realpath -e -- ' + shellQuote(cleanPath) + ') && if [ "$root" = / ]; then printf "%s\\n%s" "$root" "$target"; else case "$target" in "$root"|"$root"/*) printf "%s\\n%s" "$root" "$target";; esac; fi'
+  const command = canonicalPathCommand(cleanPath, vaultPath)
   const resolved = getStdout(await shellExec(command)).split(/\r?\n/).map(normalizePath)
   const canonicalRoot = resolved[0] || ''
   const canonicalPath = resolved[1] || ''

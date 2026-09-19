@@ -10,7 +10,7 @@ source = source.replace(
   '\nexport default {',
   `
 globalThis.__vaultViewTest = {
-  ID, VERSION, attachVaultCapabilitiesToDraft, compactVaultContext, detectConfiguredVaultPath, findAgentNoteMatches, installVaultContextPresentation, isVaultRelevantRequest, renderImage, resolveImagePath, validDetectedPath,
+  ID, VERSION, attachVaultCapabilitiesToDraft, canonicalPathCommand, compactVaultContext, detectConfiguredVaultPath, fileRevisionCommand, findAgentNoteMatches, installVaultContextPresentation, isVaultRelevantRequest, renderImage, resolveImagePath, validDetectedPath,
   setRuntime: function(ctx, session) { pluginCtx = ctx; vaultSessionContext = session }
 }
 globalThis.__vaultViewPlugin = {`
@@ -63,9 +63,18 @@ vm.runInNewContext(source, sandbox, { filename: pluginPath })
 
 const api = sandbox.__vaultViewTest
 assert.equal(api.ID, 'vault-view')
-assert.equal(api.VERSION, '0.4.4')
+assert.equal(api.VERSION, '0.4.5')
 assert.equal(api.validDetectedPath('/vault/'), '/vault')
 assert.equal(api.validDetectedPath('/vault\nsecret'), '')
+
+const revisionCommand = api.fileRevisionCommand('/vault/Note with spaces.md')
+assert.match(revisionCommand, /case "\$\(uname -s\)" in Darwin\)/)
+assert.match(revisionCommand, /Darwin\) stat -L -f '%z\|%m\|%c\|%i'/)
+assert.match(revisionCommand, /\*\) stat -L -c '%s\|%Y\|%Z\|%i' --/)
+
+const canonicalCommand = api.canonicalPathCommand('/vault/Attachments/image.png', '/vault')
+assert.match(canonicalCommand, /Darwin\) root=\$\(realpath '\/vault'\) && target=\$\(realpath '\/vault\/Attachments\/image\.png'\)/)
+assert.match(canonicalCommand, /\*\) root=\$\(realpath -e -- '\/vault'\) && target=\$\(realpath -e -- '\/vault\/Attachments\/image\.png'\)/)
 
 const root = '/vault'
 const files = [
