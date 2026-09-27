@@ -16,3 +16,11 @@ Search existing issues and use a synthetic example whenever possible. Include th
 Keep `vault-view` as a standalone Desktop Plugin based only on public Hermes SDK capabilities. Do not add machine-specific paths or automatic note-content sharing.
 
 Contributions are licensed under the repository’s [MIT License](LICENSE).
+
+## Regression checks
+
+Run the focused suites in `tests/`: `file-bytes.cjs`, `io-diagnostics.cjs`, `progressive-reading.cjs`, `attachment-opening.cjs`, `image-preview.cjs`, `image-boundary.cjs` and `scan-isolation.cjs`. The browser suite `editor-browser.cjs` requires Playwright with Chromium; `PLAYWRIGHT_MODULE` may select an existing installation.
+
+On Windows with WSL, run `wsl-read.cjs`, `wsl-image-preview.cjs` (ffmpeg/ffprobe required) and `wsl-scan.cjs`. The optional `gateway-opening.cjs` accepts `VAULT_APPROVAL_MODULE` pointing to the gateway policy module and checks classification without launching applications. All fixtures are synthetic.
+
+Read [AGENTS.md](AGENTS.md) for AI-assisted contributions.

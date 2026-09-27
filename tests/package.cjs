@@ -1,0 +1,10 @@
+const fs = require('node:fs')
+const path = require('node:path')
+const assert = require('node:assert/strict')
+const root = path.join(__dirname, '..')
+const source = fs.readFileSync(path.join(root, 'plugin.js'))
+assert.deepEqual(fs.readFileSync(path.join(root, 'desktop', 'plugin.js')), source, 'catalog entry point must match standalone entry point')
+const version = source.toString().match(/const VERSION = '([^']+)'/)[1]
+assert.match(fs.readFileSync(path.join(root, 'plugin.yaml'), 'utf8'), new RegExp('version: ' + version.replaceAll('.', '\\.')))
+for (const name of ['README.md', 'README.fr.md']) assert.ok(fs.readFileSync(path.join(root, name), 'utf8').includes('v' + version))
+console.log('Vault View package: OK (identical entry points and synchronized versions)')

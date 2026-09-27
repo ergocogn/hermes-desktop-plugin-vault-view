@@ -1,15 +1,29 @@
 # Vault View
 
+![Vault View — Markdown, images and links in Hermes Desktop](assets/banner.png)
+
 **Your Obsidian-compatible vault, directly inside Hermes Desktop.**
 
 [English](README.md) · [Français](README.fr.md)
 
-[![Release v0.4.5](https://img.shields.io/badge/release-v0.4.5-2563eb)](https://github.com/ergocogn/hermes-desktop-plugin-vault-view/releases/tag/v0.4.5)
+[![Release v0.4.6](https://img.shields.io/badge/release-v0.4.6-2563eb)](https://github.com/ergocogn/hermes-desktop-plugin-vault-view/releases/tag/v0.4.6)
 [![Install in Hermes Desktop](https://img.shields.io/badge/Install%20in-Hermes%20Desktop-2563eb)](hermes://plugin/install?repo=ergocogn/hermes-desktop-plugin-vault-view)
 
 ![Vault View displaying a linked Markdown note, explorer, outline, and graph inside Hermes Desktop](screenshots/vault-view-light.png)
 
 Vault View brings your Markdown knowledge base into the conversation. Find a note, ask Hermes to create or update it, follow its links, and keep several notes open in a workspace designed for a vault—not a generic file preview.
+
+## What is new in 0.4.6
+
+- Reliable chunked reading and verified saves for long notes.
+- Faster navigation with bounded, revision-aware caches and progressive reading.
+- Live Markdown styling, source preservation, tag search and responsive sidebars.
+- Lazy image previews, a detail viewer, and image/text/code attachment previews.
+- Shared note tabs across conversations, editing undo/redo and private incident diagnostics.
+
+Raster thumbnails use ffmpeg when available; original images remain available as a fallback. The filesystem transport requires Unix/WSL shell utilities. Direct Obsidian opening is temporarily hidden; external application opening depends on the host/backend configuration. Native Windows/macOS launch validation remains incomplete.
+
+See [CHANGELOG.md](CHANGELOG.md) for the complete changes and [AGENTS.md](AGENTS.md) for the public AI contribution guide.
 
 ## Find. Create. Navigate.
 
@@ -34,6 +48,8 @@ Vault View brings your Markdown knowledge base into the conversation. Find a not
 ## How it works with Hermes
 
 The Hermes agent keeps using its existing Obsidian CLI integration for note operations. Vault View provides the user-facing display and replaces the generic preview for Obsidian-related work. It can show one note, open several notes at once, or stay hidden for background-only operations.
+
+The root `plugin.js` remains the standalone entry point. `plugin.yaml` contains catalog metadata only; `desktop/plugin.js` is an identical Desktop entry point for catalog installation. There is no Python component, Agent tool, or runtime dependency added.
 
 ## Installation
 

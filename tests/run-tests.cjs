@@ -10,7 +10,7 @@ source = source.replace(
   '\nexport default {',
   `
 globalThis.__vaultViewTest = {
-  ID, VERSION, attachVaultCapabilitiesToDraft, canonicalPathCommand, compactVaultContext, detectConfiguredVaultPath, fileRevisionCommand, findAgentNoteMatches, installVaultContextPresentation, isVaultRelevantRequest, renderImage, resolveImagePath, validDetectedPath,
+  ID, VERSION, attachVaultCapabilitiesToDraft, compactVaultContext, detectConfiguredVaultPath, filterVaultNotes, findAgentNoteMatches, installVaultContextPresentation, isVaultRelevantRequest, validDetectedPath,
   setRuntime: function(ctx, session) { pluginCtx = ctx; vaultSessionContext = session }
 }
 globalThis.__vaultViewPlugin = {`
@@ -62,19 +62,22 @@ sandbox.globalThis = sandbox
 vm.runInNewContext(source, sandbox, { filename: pluginPath })
 
 const api = sandbox.__vaultViewTest
+const tagFiles = ['/vault/Inline.md', '/vault/Yaml.md', '/vault/Nested.md', '/vault/Other.md', '/vault/Project filename.md', '/vault/Pending.md']
+const tagContents = new Map([
+  [tagFiles[0], 'Text #Project'],
+  [tagFiles[1], '---\ntags: [project]\n---\nBody'],
+  [tagFiles[2], 'Text #project/phase-one'],
+  [tagFiles[3], 'Text #projectile'],
+  [tagFiles[4], 'No matching tag'],
+])
+assert.deepEqual(Array.from(api.filterVaultNotes(tagFiles, '/vault', '#PROJECT', tagContents)), tagFiles.slice(0, 3), 'tag search covers inline/YAML/nested tags, without matching prefixes or filenames')
+assert.deepEqual(Array.from(api.filterVaultNotes(tagFiles, '/vault', '#project/phase-one', tagContents)), [tagFiles[2]])
+assert.deepEqual(Array.from(api.filterVaultNotes(tagFiles, '/vault', '#missing', tagContents)), [])
+assert.deepEqual(Array.from(api.filterVaultNotes(tagFiles, '/vault', 'project filename', tagContents)), [tagFiles[4]], 'ordinary filename search still works')
 assert.equal(api.ID, 'vault-view')
-assert.equal(api.VERSION, '0.4.5')
+assert.equal(api.VERSION, '0.4.6')
 assert.equal(api.validDetectedPath('/vault/'), '/vault')
 assert.equal(api.validDetectedPath('/vault\nsecret'), '')
-
-const revisionCommand = api.fileRevisionCommand('/vault/Note with spaces.md')
-assert.match(revisionCommand, /case "\$\(uname -s\)" in Darwin\)/)
-assert.match(revisionCommand, /Darwin\) stat -L -f '%z\|%m\|%c\|%i'/)
-assert.match(revisionCommand, /\*\) stat -L -c '%s\|%Y\|%Z\|%i' --/)
-
-const canonicalCommand = api.canonicalPathCommand('/vault/Attachments/image.png', '/vault')
-assert.match(canonicalCommand, /Darwin\) root=\$\(realpath '\/vault'\) && target=\$\(realpath '\/vault\/Attachments\/image\.png'\)/)
-assert.match(canonicalCommand, /\*\) root=\$\(realpath -e -- '\/vault'\) && target=\$\(realpath -e -- '\/vault\/Attachments\/image\.png'\)/)
 
 const root = '/vault'
 const files = [
@@ -89,14 +92,6 @@ assert.deepEqual(Array.from(api.findAgentNoteMatches('Été', files, root)), ['/
 assert.deepEqual(Array.from(api.findAgentNoteMatches('Alpha', files, root)), ['/vault/Projects/Alpha.md', '/vault/Archive/Alpha.md'])
 assert.deepEqual(Array.from(api.findAgentNoteMatches('Bet', files, root)), [])
 assert.deepEqual(Array.from(api.findAgentNoteMatches('/vault/Projects/Alpha.md', files, root)), ['/vault/Projects/Alpha.md'])
-
-const imageAssets = ['/vault/Attachments/inside.png']
-assert.equal(api.resolveImagePath('../../outside.png', '/vault/Notes/Meeting.md', root, imageAssets), null)
-assert.equal(api.resolveImagePath('../../../etc/passwd', '/vault/Notes/Meeting.md', root, imageAssets), null)
-assert.equal(api.resolveImagePath('../Attachments/inside.png', '/vault/Notes/Meeting.md', root, imageAssets), '/vault/Attachments/inside.png')
-const traversalImage = api.renderImage('outside', '../../outside.png', '/vault/Notes/Meeting.md', root, imageAssets, '', false)
-assert.doesNotMatch(traversalImage, /data-local-path=/)
-assert.doesNotMatch(traversalImage, /(?:^|\s)src=["'][^"']*(?:outside\.png|etc\/passwd)/)
 
 api.setRuntime(null, { activePath: '', shareWithAgent: false })
 assert.equal(api.isVaultRelevantRequest('Peux-tu reformater ce fichier Markdown ?', root), false)
@@ -228,6 +223,12 @@ Promise.all([
   assert.match(sharedText, /Projects\/Beta Note\.md/)
   assert.doesNotMatch(sharedText, /\/vault(?:\/|\b)/)
   assert.doesNotMatch(sharedText, /Private body/)
+  api.setRuntime({ storage: { get(key) { return key.endsWith(':vault-path') ? '/vault' : 'off' } } }, { vaultPath: '/vault', activePath: '/vault/Projects/Beta Note.md', shareWithAgent: false })
+  const unshared = await api.attachVaultCapabilitiesToDraft({ ...shared, text: 'Affiche cette note dans Obsidian' })
+  assert.equal(unshared.attachments.some(item => item.id.startsWith('vault-view:agent-context:')), false, 'disabling sharing removes previously attached note metadata')
+  const repeated = await api.attachVaultCapabilitiesToDraft(unshared)
+  assert.equal(repeated.attachments.length, 1, 'repeated enrichment does not accumulate context')
+  assert.equal((await api.attachVaultCapabilitiesToDraft({ text: 'Bonjour, parlons météo', attachments: [] })).attachments.length, 0, 'unrelated prompts spend no Vault View context')
   console.log('Vault View tests: OK')
 }).catch(function(error) {
   console.error(error)
