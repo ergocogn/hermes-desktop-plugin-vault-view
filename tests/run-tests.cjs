@@ -75,7 +75,7 @@ assert.deepEqual(Array.from(api.filterVaultNotes(tagFiles, '/vault', '#project/p
 assert.deepEqual(Array.from(api.filterVaultNotes(tagFiles, '/vault', '#missing', tagContents)), [])
 assert.deepEqual(Array.from(api.filterVaultNotes(tagFiles, '/vault', 'project filename', tagContents)), [tagFiles[4]], 'ordinary filename search still works')
 assert.equal(api.ID, 'vault-view')
-assert.equal(api.VERSION, '0.4.6')
+assert.equal(api.VERSION, '0.4.7')
 assert.equal(api.validDetectedPath('/vault/'), '/vault')
 assert.equal(api.validDetectedPath('/vault\nsecret'), '')
 
@@ -177,6 +177,7 @@ api.setRuntime({
   storage: {
     get: function(key, fallback) {
       if (key.endsWith(':vault-path')) return '/vault'
+      if (key.endsWith(':agent-guidance')) return 'on'
       if (key.endsWith(':agent-context')) return 'off'
       return fallback
     },
@@ -199,7 +200,7 @@ Promise.all([
   assert.equal(results[1].attachments.length, 1)
   assert.ok(results[1].attachments[0].refText.length < 2500, 'agent pointer should stay compact')
   assert.match(results[1].attachments[0].refText, /Obsidian CLI/)
-  assert.match(results[1].attachments[0].refText, /à la place de preview/)
+  assert.match(results[1].attachments[0].refText, /instead of preview/)
   assert.doesNotMatch(results[1].attachments[0].refText, /\/vault(?:\/|\b)/)
   assert.equal(results[2], '/vault')
   assert.equal(detectionCommands.length, 2)
@@ -210,7 +211,8 @@ Promise.all([
     storage: {
       get: function(key, fallback) {
         if (key.endsWith(':vault-path')) return '/vault'
-        if (key.endsWith(':agent-context')) return 'on'
+        if (key.endsWith(':agent-guidance')) return 'on'
+      if (key.endsWith(':agent-context')) return 'on'
         return fallback
       },
     },
@@ -223,7 +225,7 @@ Promise.all([
   assert.match(sharedText, /Projects\/Beta Note\.md/)
   assert.doesNotMatch(sharedText, /\/vault(?:\/|\b)/)
   assert.doesNotMatch(sharedText, /Private body/)
-  api.setRuntime({ storage: { get(key) { return key.endsWith(':vault-path') ? '/vault' : 'off' } } }, { vaultPath: '/vault', activePath: '/vault/Projects/Beta Note.md', shareWithAgent: false })
+  api.setRuntime({ storage: { get(key) { return key.endsWith(':vault-path') ? '/vault' : key.endsWith(':agent-guidance') ? 'on' : 'off' } } }, { vaultPath: '/vault', activePath: '/vault/Projects/Beta Note.md', shareWithAgent: false })
   const unshared = await api.attachVaultCapabilitiesToDraft({ ...shared, text: 'Affiche cette note dans Obsidian' })
   assert.equal(unshared.attachments.some(item => item.id.startsWith('vault-view:agent-context:')), false, 'disabling sharing removes previously attached note metadata')
   const repeated = await api.attachVaultCapabilitiesToDraft(unshared)

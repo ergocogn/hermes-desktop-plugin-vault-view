@@ -1,6 +1,6 @@
 # Release candidate validation
 
-This checklist describes the 0.4.6 candidate. An Unreleased entry is not a published release, and passing automated checks does not certify every operating system or Hermes layout.
+This checklist describes the 0.4.7 candidate. An Unreleased entry is not a published release, and passing automated checks does not certify every operating system or Hermes layout.
 
 ## Automated checks completed
 

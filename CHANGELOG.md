@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.7 - 2026-09-28
+
+### Security and privacy
+
+- Replace the raw Electron webview with the public SDK SandboxedFrame and its default opaque-origin sandbox. Embedded pages do not share the Hermes preview partition. Some sites refuse embedding; the external browser action remains available. Guest navigation history is not accessible across origins, so unavailable Back/Forward actions are removed.
+- Add a separate opt-in setting for relevant-request agent navigation guidance, disabled by default. Disabling it removes stale guidance attachments without removing user attachments or enabling note sharing. Guidance follows the selected language and Hermes locale.
+- Block remote note images by default. An explicit setting permits their requests with no referrer; switching it off removes existing remote sources. Markdown image references and local previews remain intact.
+
+### Fixed
+
+- Route errors, notifications, prompts, confirmations, bridge messages, image controls, callout labels and formatting defaults through complete English/French locale bundles. Imperative calls follow the Hermes locale in automatic mode.
+- Require Hermes >=0.21.5 in plugin and catalog metadata. List Linux and macOS transport platforms explicitly; Windows Desktop requires a WSL-hosted Unix backend rather than a native Windows gateway.
+- Keep both plugin entry points and package version synchronized. Add regression checks for SDK embedding, independent privacy controls, language switching and remote-image network behavior.
+
 ## 0.4.6 - 2026-09-27
 
 

@@ -6,14 +6,14 @@
 
 [English](README.md) · [Français](README.fr.md)
 
-[![Version v0.4.6](https://img.shields.io/badge/version-v0.4.6-2563eb)](https://github.com/ergocogn/hermes-desktop-plugin-vault-view/releases/tag/v0.4.6)
+[![Version v0.4.7](https://img.shields.io/badge/version-v0.4.7-2563eb)](https://github.com/ergocogn/hermes-desktop-plugin-vault-view/releases/tag/v0.4.7)
 [![Installer dans Hermes Desktop](https://img.shields.io/badge/Installer%20dans-Hermes%20Desktop-2563eb)](hermes://plugin/install?repo=ergocogn/hermes-desktop-plugin-vault-view)
 
 ![Vault View affichant une note Markdown liée, l’explorateur, le plan et le graphe dans Hermes Desktop](screenshots/vault-view-light.png)
 
 Vault View intègre votre base de connaissances Markdown à la conversation. Retrouvez une note, demandez à Hermes de la créer ou de la mettre à jour, suivez ses liens et gardez plusieurs notes ouvertes dans un espace conçu pour un vault plutôt que dans un simple aperçu de fichier.
 
-## Nouveautés de la version 0.4.6
+## Nouveautés de la version 0.4.7
 
 - Lecture fiable des longues notes et enregistrement vérifié.
 - Navigation accélérée avec caches bornés et lecture progressive.
@@ -88,13 +88,15 @@ Le réglage de langue propose **Suivre Hermes Desktop**, **English** et **Franç
 - Aucun jeton, identifiant, chemin personnel ou contenu de note n’est intégré au plugin.
 - Le contenu complet d’une note n’est jamais joint automatiquement à l’agent.
 - Le partage facultatif de la note active est désactivé par défaut et ne transmet que des métadonnées légères.
+- Les images distantes sont bloquées par défaut. Leur activation envoie des requêtes à leurs fournisseurs, sans référent. Ouvrir explicitement un lien web contacte son site via le composant isolé du SDK ou le navigateur externe.
+- Les indications de navigation à l’agent sont une option indépendante et traduite.
 - Le chemin du vault reste dans le stockage local privé de Vault View.
 
 Les captures utilisent un vault de démonstration synthétique. Elles ne contiennent aucun chemin personnel, aucune conversation privée ni note réelle ; leurs métadonnées PNG ont été supprimées.
 
 ## Compatibilité
 
-- Hermes Desktop avec prise en charge des Desktop Plugins
+- Hermes Desktop >=0.21.5 avec prise en charge des Desktop Plugins
 - Vault Markdown local compatible avec Obsidian
 - Windows, macOS ou Linux, à condition que le backend Hermes actif puisse accéder au vault
 

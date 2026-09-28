@@ -69,6 +69,6 @@ sandbox.api.context({ os: { openExternal() { externalCalls++; return true }, rev
   assert.equal(await sandbox.api.openVaultFile('/vault/image.png'), true)
   assert.equal(fallbackPath, '/vault/image.png', 'POSIX launch failure reveals through the host API')
   sandbox.host.request = async () => ({ error: { code: -32000, message: 'synthetic rejected request' } })
-  await assert.rejects(sandbox.api.shellExec('synthetic'), /requête shell/, 'RPC rejection cannot be treated as a successful launch')
+  await assert.rejects(sandbox.api.shellExec('synthetic'), /shell request failed/, 'RPC rejection cannot be treated as a successful launch')
   console.log('Vault View attachment opening: OK (association, quoting, explicit failure; mocked OS)')
 })().catch(error => { console.error(error); process.exitCode = 1 })

@@ -6,14 +6,18 @@
 
 [English](README.md) · [Français](README.fr.md)
 
-[![Release v0.4.6](https://img.shields.io/badge/release-v0.4.6-2563eb)](https://github.com/ergocogn/hermes-desktop-plugin-vault-view/releases/tag/v0.4.6)
+[![Release v0.4.7](https://img.shields.io/badge/release-v0.4.7-2563eb)](https://github.com/ergocogn/hermes-desktop-plugin-vault-view/releases/tag/v0.4.7)
 [![Install in Hermes Desktop](https://img.shields.io/badge/Install%20in-Hermes%20Desktop-2563eb)](hermes://plugin/install?repo=ergocogn/hermes-desktop-plugin-vault-view)
 
 ![Vault View displaying a linked Markdown note, explorer, outline, and graph inside Hermes Desktop](screenshots/vault-view-light.png)
 
 Vault View brings your Markdown knowledge base into the conversation. Find a note, ask Hermes to create or update it, follow its links, and keep several notes open in a workspace designed for a vault—not a generic file preview.
 
-## What is new in 0.4.6
+## What is new in 0.4.7
+
+- SDK-sandboxed web previews, with Hermes >=0.21.5 required.
+- Separate agent navigation guidance and remote-image settings, both off by default.
+- Complete English/French errors, dialogs, bridge messages and formatting defaults.
 
 - Reliable chunked reading and verified saves for long notes.
 - Faster navigation with bounded, revision-aware caches and progressive reading.
@@ -76,7 +80,7 @@ Use the plugin directory shown by Hermes Desktop. The Desktop application and it
 
 Vault View automatically looks for the vault already configured through Hermes `WIKI_PATH`. If no valid `.obsidian` vault is found, select its root in the settings panel.
 
-The language setting offers **Follow Hermes Desktop**, **English**, and **Français**. The same panel controls tab restoration, panel layout, and optional active-note metadata sharing.
+The language setting offers **Follow Hermes Desktop**, **English**, and **Français**. The same panel controls tab restoration, panel layout, optional active-note metadata sharing, agent navigation guidance and remote images. All sharing/network options are independent and disabled by default.
 
 ## Privacy
 
@@ -84,15 +88,17 @@ The language setting offers **Follow Hermes Desktop**, **English**, and **Franç
 - No token, credential, personal path, or vault content is embedded in the plugin.
 - Full note content is never attached to the agent automatically.
 - Optional active-note sharing is disabled by default and sends only lightweight metadata.
+- Remote images remain blocked unless explicitly enabled; enabling them sends requests to their providers without a referrer. Explicitly opening a web link contacts its website through the SDK sandbox or external browser.
+- Navigation guidance is an independent opt-in and is localized.
 - The vault path remains in Vault View's private local plugin storage.
 
 The screenshots use a synthetic demonstration vault. They contain no personal path, private conversation, or real note content, and their PNG metadata has been removed.
 
 ## Compatibility
 
-- Hermes Desktop with Desktop Plugin support
+- Hermes Desktop >=0.21.5 with Desktop Plugin support
 - A local Markdown vault compatible with Obsidian
-- Windows, macOS, or Linux, provided the active Hermes backend can access the vault
+- Linux or macOS Unix transport. Windows Desktop can use a WSL-hosted Unix backend; native Windows gateways are not supported by the POSIX file transport.
 
 ## Support and contributions
 

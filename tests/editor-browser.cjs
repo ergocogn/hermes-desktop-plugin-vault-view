@@ -12,7 +12,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright')
       .replace(/^import .*$/gm, '').replace('export default {', 'globalThis.plugin = {')
     await page.addScriptTag({ content: source })
     await page.evaluate(() => {
-      window.jsx = (type, props) => ({ type, props })
+      window.jsx = (type, props) => ({ type, props }); setVaultUiLanguage('fr', false)
       const style = document.createElement('style')
       style.textContent = [].concat(styles().props.children).join('')
       document.head.appendChild(style)
@@ -220,6 +220,26 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright')
     console.log('Vault View browser lazy images: OK (only images near the viewport load)')
     // Lightweight hook harness for the reading component. IntersectionObserver,
     // scroll and buttons run in a real browser; this is not a full Hermes mount.
+    await page.setContent('<article id="editor" class="ov-md" contenteditable="true"></article>')
+    let remoteRequests = 0
+    await page.route('https://remote.example/**', async route => {
+      remoteRequests++
+      await route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="2" height="2"/>' })
+    })
+    await page.evaluate(() => {
+      setVaultUiLanguage('en', false)
+      window.remoteSource = '![Screenshot](https://remote.example/picture.svg)\n'
+      document.getElementById('editor').innerHTML = marked.parse(remoteSource, { currentPath: '/vault/Note.md', vaultPath: '/vault', allFiles: [], allAssets: [] })
+    })
+    await page.waitForTimeout(150)
+    assert.equal(remoteRequests, 0, 'default remote-image policy makes no requests')
+    assert.equal(await page.evaluate(() => visualEditorToMarkdown(document.getElementById('editor')).trim()), '![Screenshot](https://remote.example/picture.svg)', 'blocked image retains Markdown source')
+    await page.evaluate(() => setPrivacyPreference(STORAGE_REMOTE_IMAGES, true, false))
+    await page.waitForFunction(() => document.querySelector('#editor img').complete && document.querySelector('#editor img').naturalWidth > 0)
+    assert.equal(remoteRequests, 1, 'explicit opt-in loads the existing image without reparsing the note')
+    await page.evaluate(() => setPrivacyPreference(STORAGE_REMOTE_IMAGES, false, false))
+    assert.equal(await page.locator('#editor img').getAttribute('src'), null, 'opt-out removes existing remote sources')
+    console.log('Vault View browser remote privacy: OK (no default request, explicit load, source retained)')
     await page.setContent('<div class="ov-main" style="height:220px;width:600px;overflow:auto"><div id="mount"></div></div>')
     await page.evaluate(() => {
       const slots = []

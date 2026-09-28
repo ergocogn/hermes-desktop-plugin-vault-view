@@ -24,3 +24,5 @@ Run the focused suites in `tests/`: `file-bytes.cjs`, `io-diagnostics.cjs`, `pro
 On Windows with WSL, run `wsl-read.cjs`, `wsl-image-preview.cjs` (ffmpeg/ffprobe required) and `wsl-scan.cjs`. The optional `gateway-opening.cjs` accepts `VAULT_APPROVAL_MODULE` pointing to the gateway policy module and checks classification without launching applications. All fixtures are synthetic.
 
 Read [AGENTS.md](AGENTS.md) for AI-assisted contributions.
+
+Run `node tests/catalog-policy.cjs` for SDK embedding, complete English/French locale bundles, imperative locale selection and independent agent-guidance/image privacy settings. The browser suite also verifies that blocked remote images make no request and preserve their Markdown source.
