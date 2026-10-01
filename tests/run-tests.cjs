@@ -10,7 +10,7 @@ source = source.replace(
   '\nexport default {',
   `
 globalThis.__vaultViewTest = {
-  ID, VERSION, attachVaultCapabilitiesToDraft, compactVaultContext, detectConfiguredVaultPath, filterVaultNotes, findAgentNoteMatches, installVaultContextPresentation, isVaultRelevantRequest, validDetectedPath,
+  ID, VERSION, attachVaultCapabilitiesToDraft, compactVaultContext, detectConfiguredVaultPath, filterVaultNotes, findAgentNoteMatches, isVaultRelevantRequest, validDetectedPath,
   setRuntime: function(ctx, session) { pluginCtx = ctx; vaultSessionContext = session }
 }
 globalThis.__vaultViewPlugin = {`
@@ -107,47 +107,9 @@ const wrapped = api.compactVaultContext({
   text: 'Affiche cette note dans Obsidian',
   attachments: [{ id: 'vault-view:capabilities', label: 'Vault View', refText: 'Contexte compact' }],
 })
-assert.match(wrapped.attachments[0].refText, /^<ide_opened_file>/)
-assert.match(wrapped.attachments[0].refText, /<\/ide_opened_file>$/)
+assert.doesNotMatch(wrapped.attachments[0].refText, /ide_opened_file/)
 assert.match(wrapped.attachments[0].refText, /:command\[Vault View\]/)
-
-const opening = { nodeType: 3, textContent: '<ide_opened_file>\n' }
-const closing = { nodeType: 3, textContent: '\n</ide_opened_file>' }
-const chip = { nodeType: 1, childNodes: [], matches: function(selector) { return selector.includes('aui_directive-chip') } }
-const attributes = new Set()
-const wrapper = {
-  nodeType: 1,
-  childNodes: [opening, chip, closing],
-  parentElement: null,
-  matches: function(selector) { return selector.includes('aui_directive-text') },
-  closest: function(selector) { return this.matches(selector) ? this : null },
-  querySelector: function() { return chip },
-  querySelectorAll: function() { return [] },
-  setAttribute: function(name) { attributes.add(name) },
-  hasAttribute: function(name) { return attributes.has(name) },
-  removeAttribute: function(name) { attributes.delete(name) },
-  isConnected: true,
-}
-const body = {
-  nodeType: 1,
-  childNodes: [wrapper],
-  parentElement: null,
-  closest: function() { return null },
-  querySelector: function() { return chip },
-  querySelectorAll: function() { return [wrapper] },
-}
-wrapper.parentElement = body
-sandbox.document = { body }
-sandbox.MutationObserver = class MutationObserver {
-  constructor(callback) { this.callback = callback }
-  observe() {}
-  disconnect() {}
-}
-const uninstallPresentation = api.installVaultContextPresentation()
-assert.equal(opening.textContent, '')
-assert.equal(closing.textContent, '')
-assert.equal(attributes.has('data-vault-context-envelope'), true)
-uninstallPresentation()
+assert.doesNotMatch(source, /data-vault-context-envelope|aui_directive-text|preview-tile:/)
 
 const pluginSource = fs.readFileSync(pluginPath, 'utf8')
 assert.doesNotMatch(pluginSource, /(?:[A-Za-z]:\\Users\\|\/home\/)[^/\\\s]+[\\/]/)

@@ -220,7 +220,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright')
     console.log('Vault View browser lazy images: OK (only images near the viewport load)')
     // Lightweight hook harness for the reading component. IntersectionObserver,
     // scroll and buttons run in a real browser; this is not a full Hermes mount.
-    await page.setContent('<article id="editor" class="ov-md" contenteditable="true"></article>')
+    await page.setContent('<div class="ov-root"><article id="editor" class="ov-md" contenteditable="true"></article></div>')
     let remoteRequests = 0
     await page.route('https://remote.example/**', async route => {
       remoteRequests++
@@ -284,6 +284,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright')
         }
         const node = document.createElement(tree.type)
         if (tree.props.className) node.className = tree.props.className
+        if (tree.props.tabIndex !== undefined) node.tabIndex = tree.props.tabIndex
         if (tree.props.ref) tree.props.ref.current = node
         if (tree.props.onClick) node.onclick = tree.props.onClick
         const children = tree.props.children == null ? [] : Array.isArray(tree.props.children) ? tree.props.children : [tree.props.children]
@@ -307,6 +308,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright')
     await page.evaluate(() => { document.querySelector('.ov-main').scrollTop = 1e8 })
     await page.waitForTimeout(150)
     assert.ok(await page.locator('.ov-reading-page').count() >= 3, 'scroll loads the next section')
+    await page.locator('.ov-progressive-reading').focus()
     await page.keyboard.press('Control+f')
     await page.waitForTimeout(100)
     assert.equal(await page.locator('.ov-reading-page').count(), await page.evaluate(() => totalReadingPages))

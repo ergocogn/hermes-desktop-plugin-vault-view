@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react'
 
 const ID = 'vault-view'
 const NAME = 'Vault View'
-const VAULT_TAB_ICON_CSS = '[data-tree-tab^="plugin-workspace:vault-view:"]::before{content:"\\ea7b";font-family:codicon;font-size:13px;font-style:normal;font-weight:normal;flex-shrink:0;color:var(--ui-text-tertiary);margin-right:4px;}'
 const VERSION = '0.4.7'
 const VAULT_PATH_DEFAULT = ''
 const VAULT_ENV_KEY = 'WIKI_PATH'
@@ -24,7 +23,7 @@ let browserTabSerial = 0
 
 const LOCALES = {
   en: {
-    contextLabel: 'Vault View context', linkText: 'link text', columnOne: 'Column 1', columnTwo: 'Column 2', valueOne: 'Value 1', valueTwo: 'Value 2', tableSource: '| Column 1 | Column 2 |\n| --- | --- |\n| Value 1 | Value 2 |', tableMarkup: '<table><thead><tr><th>Column 1</th><th>Column 2</th></tr></thead><tbody><tr><td>Value 1</td><td>Value 2</td></tr></tbody></table>',
+    contextLabel: 'Vault View context', messageVaultLabel: 'Vault: ', imagePlaceholderPath: 'path/image.png', imagePlaceholderAlt: 'description', linkText: 'link text', columnOne: 'Column 1', columnTwo: 'Column 2', valueOne: 'Value 1', valueTwo: 'Value 2', tableSource: '| Column 1 | Column 2 |\n| --- | --- |\n| Value 1 | Value 2 |', tableMarkup: '<table><thead><tr><th>Column 1</th><th>Column 2</th></tr></thead><tbody><tr><td>Value 1</td><td>Value 2</td></tr></tbody></table>',
     incomingLabel: "Incoming links: ",
     outgoingLabel: "Outgoing links: ",
     none: "none",
@@ -206,7 +205,7 @@ const LOCALES = {
     description: 'Viewer and editor for Obsidian-compatible vaults. Standalone Hermes Desktop plugin.', attachActive: 'Attach the active Vault View note content'
   },
   fr: {
-    contextLabel: 'Contexte Vault View', linkText: 'texte du lien', columnOne: 'Colonne 1', columnTwo: 'Colonne 2', valueOne: 'Valeur 1', valueTwo: 'Valeur 2', tableSource: '| Colonne 1 | Colonne 2 |\n| --- | --- |\n| Valeur 1 | Valeur 2 |', tableMarkup: '<table><thead><tr><th>Colonne 1</th><th>Colonne 2</th></tr></thead><tbody><tr><td>Valeur 1</td><td>Valeur 2</td></tr></tbody></table>',
+    contextLabel: 'Contexte Vault View', messageVaultLabel: 'Vault : ', imagePlaceholderPath: 'chemin/image.png', imagePlaceholderAlt: 'description', linkText: 'texte du lien', columnOne: 'Colonne 1', columnTwo: 'Colonne 2', valueOne: 'Valeur 1', valueTwo: 'Valeur 2', tableSource: '| Colonne 1 | Colonne 2 |\n| --- | --- |\n| Valeur 1 | Valeur 2 |', tableMarkup: '<table><thead><tr><th>Colonne 1</th><th>Colonne 2</th></tr></thead><tbody><tr><td>Valeur 1</td><td>Valeur 2</td></tr></tbody></table>',
     incomingLabel: "Liens entrants : ",
     outgoingLabel: "Liens sortants : ",
     none: "aucun",
@@ -408,7 +407,7 @@ function setPrivacyPreference(key, enabled, persist = true) {
   if (key === STORAGE_REMOTE_IMAGES) {
     remoteImagesEnabled = Boolean(enabled)
     markdownRenderCache.clear()
-    if (typeof document !== 'undefined') document.querySelectorAll('img[data-markdown-src]').forEach(function(image) {
+    if (typeof document !== 'undefined') document.querySelectorAll('.ov-root img[data-markdown-src]').forEach(function(image) {
       const source = image.getAttribute('data-markdown-src') || ''
       if (!/^(?:https?:|\/\/)/i.test(source)) return
       if (remoteImagesEnabled) image.setAttribute('src', source)
@@ -1809,7 +1808,7 @@ function buildSessionNoteContext(context) {
   const content = String(context.content || '')
   return [
     '[' + t('contextStart') + ']',
-    'Vault : ' + basename(normalizePath(context.vaultPath).replace(/\/+$/, '')),
+    t('messageVaultLabel') + basename(normalizePath(context.vaultPath).replace(/\/+$/, '')),
     t('messageNote') + relative,
     t('messageTags') + (context.tags.length ? context.tags.map(function(tag) { return '#' + tag }).join(', ') : t('none')),
     t('outgoingLabel') + (outgoing.length ? outgoing.join(', ') : t('none')),
@@ -1845,83 +1844,15 @@ function formatContextReferences(label, text) {
   }).join(' ')
 }
 
-function installVaultContextPresentation() {
-  if (typeof document === 'undefined' || typeof MutationObserver === 'undefined') return undefined
-  const marked = new Set()
-  const chipSelector = '[data-slot="aui_directive-chip"][data-ref="command"][data-directive-id^=\'["Vault View",\']'
-  function containsVaultChip(element) {
-    if (!element) return false
-    if (element.matches && element.matches(chipSelector)) return true
-    return Boolean(element.querySelector && element.querySelector(chipSelector))
-  }
-  function inspect(element) {
-    if (!element || !element.matches('[data-slot="aui_directive-text"]')) return
-    const scope = element.parentElement || element
-    const hasVaultChip = containsVaultChip(element) || containsVaultChip(scope)
-    if (!hasVaultChip) return
-    let envelope = false
-    function clean(node) {
-      if (node.nodeType === 3) {
-        const source = String(node.textContent || '')
-        if (!/<\/?ide_opened_file>/.test(source)) return
-        envelope = true
-        const cleaned = source.replace(/<\/?ide_opened_file>/g, '')
-        node.textContent = cleaned.trim() ? cleaned : ''
-        return
-      }
-      if (node.nodeType !== 1 || (node.matches && node.matches(chipSelector))) return
-      Array.from(node.childNodes || []).forEach(clean)
-    }
-    clean(element)
-    if (envelope || element.hasAttribute('data-vault-context-envelope')) {
-      element.setAttribute('data-vault-context-envelope', '')
-      marked.add(element)
-    }
-  }
-  function inspectTree(node) {
-    const element = node.nodeType === 1 ? node : node.parentElement
-    if (!element) return
-    inspect(element.closest('[data-slot="aui_directive-text"]'))
-    element.querySelectorAll('[data-slot="aui_directive-text"]').forEach(inspect)
-  }
-  inspectTree(document.body)
-  const observer = new MutationObserver(function(records) {
-    records.forEach(function(record) {
-      inspectTree(record.target)
-      record.addedNodes.forEach(inspectTree)
-    })
-    marked.forEach(function(element) { if (!element.isConnected) marked.delete(element) })
-  })
-  observer.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['data-directive-id'] })
-  return function() {
-    observer.disconnect()
-    marked.forEach(function(element) { element.removeAttribute('data-vault-context-envelope') })
-  }
-}
-
-function contextReferenceStyles() {
-  useEffect(installVaultContextPresentation, [])
-  const selector = `[data-slot="aui_directive-chip"][data-ref="command"][data-directive-id^='["Vault View",']`
-  return jsx('style', {
-    children: VAULT_TAB_ICON_CSS +
-      '[data-vault-context-envelope]{display:contents!important;}' +
-      selector + '{font-size:11px;font-weight:400;line-height:1.4;color:var(--ui-text-tertiary);padding:1px 4px;}' +
-      selector + ' svg{width:11px;height:11px;}' +
-      selector + ':hover{color:var(--ui-text-secondary);}',
-  })
-}
-
 function compactVaultContext(draft) {
   const isVaultContext = function(attachment) { return attachment.id === ID + ':capabilities' || String(attachment.id || '').startsWith(ID + ':agent-context:') }
   const ordered = draft.attachments.filter(isVaultContext).concat(draft.attachments.filter(function(attachment) { return !isVaultContext(attachment) }))
   return Object.assign({}, draft, {
     attachments: ordered.map(function(attachment) {
       if (attachment.id !== ID + ':capabilities' && !String(attachment.id || '').startsWith(ID + ':agent-context:')) return attachment
-      if (String(attachment.refText || '').startsWith('<ide_opened_file>')) return attachment
       const ref = String(attachment.refText || '')
       return Object.assign({}, attachment, {
-        // Hermes strips this machine-context envelope before deriving or generating a session title.
-        refText: '<ide_opened_file>\n' + (ref.startsWith(':command[') ? ref : formatContextReferences(attachment.id === ID + ':capabilities' ? 'Vault View' : t('messageNote') + attachment.label, ref)) + '\n</ide_opened_file>',
+        refText: ref.startsWith(':command[') ? ref : formatContextReferences(attachment.id === ID + ':capabilities' ? 'Vault View' : t('messageNote') + attachment.label, ref),
       })
     }),
   })
@@ -2459,7 +2390,7 @@ function calloutDefinition(rawType) {
     note: ['Note', 'note'], abstract: [t('messageSummary'), 'list-unordered'], info: [t('messageInformation'), 'info'],
     todo: [t('messageToDo'), 'checklist'], tip: [t('messageTip'), 'lightbulb'], success: [t('messageSuccess'), 'pass'],
     question: [t('messageQuestion'), 'question'], warning: [t('messageWarning'), 'warning'], failure: [t('messageFailure'), 'error'],
-    danger: [t('messageDanger'), 'error'], bug: ['Bug', 'bug'], example: [t('messageExample'), 'beaker'], quote: ['Citation', 'quote'],
+    danger: [t('messageDanger'), 'error'], bug: ['Bug', 'bug'], example: [t('messageExample'), 'beaker'], quote: [t('quote'), 'quote'],
   }
   const definition = definitions[type] || definitions.note
   return { type: definitions[type] ? type : 'note', title: definition[0], icon: definition[1] }
@@ -3082,7 +3013,7 @@ function formatActiveMarkdown(root, kind) {
   const selection = window.getSelection()
   if (!active || !selection || !selection.rangeCount || !active.contains(selection.anchorNode) || !active.contains(selection.focusNode)) return false
   const selected = selection.toString()
-  const wraps = { bold: ['**', '**', t('messageText')], italic: ['*', '*', t('messageText')], code: ['`', '`', 'code'], wikilink: ['[[', ']]', t('messageNoteName')], link: ['[', '](url)', t('linkText')], image: ['![', '](chemin/image.png)', 'description'] }
+  const wraps = { bold: ['**', '**', t('messageText')], italic: ['*', '*', t('messageText')], code: ['`', '`', 'code'], wikilink: ['[[', ']]', t('messageNoteName')], link: ['[', '](url)', t('linkText')], image: ['![', '](' + t('imagePlaceholderPath') + ')', t('imagePlaceholderAlt')] }
   let replacement
   if (kind === 'tag') replacement = markdownTagForSelection(selected)
   else if (wraps[kind]) {
@@ -3322,15 +3253,17 @@ function openWikilinkAtCaret(root) {
 function decorateCodeBlocks(root) {
   if (!root || typeof document === 'undefined') return
   Array.from(root.querySelectorAll('pre')).forEach(function(pre) {
-    if (pre.querySelector('[data-copy-code="true"]')) return
-    const button = document.createElement('button')
-    button.type = 'button'
-    button.className = 'ov-button ov-icon-button ov-code-copy'
-    button.setAttribute('data-copy-code', 'true')
-    button.setAttribute('aria-label', 'Copier le code')
-    button.title = 'Copier le code'
-    button.innerHTML = '<span class="codicon codicon-copy" aria-hidden="true"></span>'
-    pre.appendChild(button)
+    let button = pre.querySelector('[data-copy-code="true"]')
+    if (!button) {
+      button = document.createElement('button')
+      button.type = 'button'
+      button.className = 'ov-button ov-icon-button ov-code-copy'
+      button.setAttribute('data-copy-code', 'true')
+      button.innerHTML = '<span class="codicon codicon-copy" aria-hidden="true"></span>'
+      pre.appendChild(button)
+    }
+    button.setAttribute('aria-label', t('copyCode'))
+    button.title = t('copyCode')
   })
 }
 
@@ -3674,7 +3607,6 @@ function styles() {
   return jsx('style', {
     children: [
       '.ov-root{height:100%;display:flex;min-height:0;position:relative;color:var(--foreground);background:var(--ui-bg-editor);font-size:12px;container-name:ovvault;container-type:inline-size;}',
-      VAULT_TAB_ICON_CSS,
       '.ov-sidebar{height:100%;min-width:170px;max-width:420px;flex:0 0 auto;display:flex;flex-direction:column;border-right:1px solid var(--ui-stroke-secondary);min-height:0;overflow:hidden;background:var(--ui-bg-sidebar);}',
       '.ov-resizer{width:4px;margin-left:-2px;cursor:col-resize;position:relative;z-index:2;}',
       '.ov-resizer:hover{box-shadow:inset 1px 0 var(--ui-accent);}',
@@ -4506,7 +4438,7 @@ function MainPane({ tabId = DEFAULT_TAB_ID, initialPath = '' } = {}) {
     else if (kind === 'rule') document.execCommand('insertHorizontalRule', false)
     else if (kind === 'link') {
       const href = window.prompt(t('messageLinkAddress'), 'https://')
-      if (href) document.execCommand('insertHTML', false, '<a href="' + escapeAttr(href) + '" data-markdown-href="' + escapeAttr(href) + '">' + escapeHtml(selection || 'lien') + '</a>')
+      if (href) document.execCommand('insertHTML', false, '<a href="' + escapeAttr(href) + '" data-markdown-href="' + escapeAttr(href) + '">' + escapeHtml(selection || t('linkText')) + '</a>')
     } else if (kind === 'wikilink') {
       const name = window.prompt(t('messageNoteName'), selection || '')
       if (name) document.execCommand('insertHTML', false, '<a href="#" class="ov-md-wikilink" data-wikilink="' + escapeAttr(name) + '">' + escapeHtml(selection || name) + '</a>')
@@ -4561,10 +4493,11 @@ function MainPane({ tabId = DEFAULT_TAB_ID, initialPath = '' } = {}) {
       selectStart = start + label.length + 3
       selectEnd = selectStart + 3
     } else if (kind === 'image') {
-      const alt = selected || 'description'
-      replacement = '![' + alt + '](chemin/image.png)'
+      const alt = selected || t('imagePlaceholderAlt')
+      const placeholderPath = t('imagePlaceholderPath')
+      replacement = '![' + alt + '](' + placeholderPath + ')'
       selectStart = start + alt.length + 4
-      selectEnd = selectStart + 'chemin/image.png'.length
+      selectEnd = selectStart + placeholderPath.length
     } else if (kind === 'rule') {
       const before = start > 0 && rawContent[start - 1] !== '\n' ? '\n' : ''
       const after = end < rawContent.length && rawContent[end] !== '\n' ? '\n' : ''
@@ -6631,11 +6564,13 @@ function ProgressiveMarkdownView(props) {
     return function() { observer.disconnect() }
   }, [count, pages.length, loadMore])
   useEffect(function() {
+    const root = readingRef.current
+    if (!root) return undefined
     function search(event) { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f') showAll() }
-    document.addEventListener('keydown', search, true)
-    return function() { document.removeEventListener('keydown', search, true) }
+    root.addEventListener('keydown', search, true)
+    return function() { root.removeEventListener('keydown', search, true) }
   }, [showAll])
-  return jsxs('div', { ref: readingRef, className: 'ov-progressive-reading', children: [
+  return jsxs('div', { ref: readingRef, className: 'ov-progressive-reading', tabIndex: -1, children: [
     ...pages.slice(0, count).map(function(page, index) {
       return jsx('section', { className: 'ov-reading-page', children: jsx(MarkdownView, { ...props, content: page.content, headingOffset: page.headingOffset }) }, index)
     }),
@@ -6728,7 +6663,7 @@ function MarkdownView({ content, currentPath, vaultPath, allFiles, allAssets, he
     decorateCodeBlocks(root)
     hydrateLocalImages(root)
     return function() { if (root && root.__imageObserver) root.__imageObserver.disconnect() }
-  }, [html])
+  }, [html, t])
 
   useEffect(function() {
     if (!headingTarget || !articleRef.current) return undefined
@@ -7230,13 +7165,6 @@ function PaletteCommand({ files, vaultPath, initialQuery, contentsByPath = vault
   })
 }
 
-function previewPaneAnchor() {
-  if (typeof document === 'undefined' || !document.querySelectorAll) return ''
-  const tabs = Array.from(document.querySelectorAll('[data-tree-tab^="preview-tile:"]'))
-  const anchor = tabs[0]
-  return anchor ? String(anchor.getAttribute('data-tree-tab') || '') : ''
-}
-
 function listenVaultConversationChanges(state, onChange) {
   const store = state && (state.focusedStoredSessionId || state.selectedStoredSessionId || state.activeSessionId)
   if (!store || typeof store.listen !== 'function' || typeof store.get !== 'function') return function() {}
@@ -7317,7 +7245,7 @@ export default {
       const tab = existing || { tabId: tabId, path: options.path || '' }
       tab.suspended = false
       tab.title = tab.path ? basename(tab.path).replace(/\.md$/i, '') : 'Vault View'
-      const previewAnchor = vaultTabs.has(previousTabId) && previousTabId !== tabId ? 'plugin-workspace:' + previousTabId : previewPaneAnchor()
+      const previewAnchor = vaultTabs.has(previousTabId) && previousTabId !== tabId ? 'plugin-workspace:' + previousTabId : ''
       vaultTabs.set(tabId, tab)
       const workspaceOptions = {
         dock: previewAnchor
@@ -7326,6 +7254,7 @@ export default {
         minWidth: '36rem',
         title: tab.title,
         onClose: function() {
+          if (tab.visibilityStop) { tab.visibilityStop(); tab.visibilityStop = null }
           if (disposed) return
           if (tab.suspended) {
             tab.close = null
@@ -7353,6 +7282,18 @@ export default {
       } catch (error) {
         if (!existing) vaultTabs.delete(tabId)
         throw error
+      }
+      if (tab.visibilityStop) tab.visibilityStop()
+      tab.visibilityStop = null
+      if (typeof host.paneVisibility === 'function') {
+        try {
+          const visibility = host.paneVisibility('plugin-workspace:' + tabId)
+          if (visibility && typeof visibility.listen === 'function') {
+            tab.visibilityStop = visibility.listen(function(visible) {
+              if (visible && !disposed && !tab.suspended) selectVaultTab(tabId)
+            })
+          }
+        } catch (error) { reportPluginError('workspace visibility unavailable', error) }
       }
       tab.updateTitle = function() {
         const title = tab.path ? basename(tab.path).replace(/\.md$/i, '') : 'Vault View'
@@ -7411,16 +7352,6 @@ export default {
         tabs.forEach(function(tab) { showVaultWorkspace({ tabId: tab.tabId, path: tab.path || '' }) })
       }, 150)
     })
-    function trackTabSelection(event) {
-      const element = event.target && event.target.closest ? event.target.closest('[data-tree-tab]') : null
-      const paneId = element && element.getAttribute('data-tree-tab')
-      if (paneId && paneId.startsWith('plugin-workspace:')) selectVaultTab(paneId.slice('plugin-workspace:'.length))
-    }
-    if (typeof document !== 'undefined') {
-      document.addEventListener('click', trackTabSelection, true)
-      document.addEventListener('focusin', trackTabSelection, true)
-    }
-
     async function pollAgentBridge() {
       if (disposed || agentBridgePolling) return
       agentBridgePolling = true
@@ -7520,15 +7451,8 @@ export default {
     }).catch(function(error) { reportPluginError('initial agent state unavailable', error) })
 
     if (host && typeof host.openWorkspace === 'function') {
-      let attempts = 0
-      const openAfterPreviewRestore = function() {
+      const restoreWorkspaceTabs = function() {
         if (disposed || workspaceTouched) return
-        const anchor = previewPaneAnchor()
-        if (!anchor && attempts < 10) {
-          attempts += 1
-          initialOpenTimer = setTimeout(openAfterPreviewRestore, 80)
-          return
-        }
         initialOpenTimer = null
         Promise.all([storageGet(STORAGE_TABS, null), storageGet(STORAGE_RESTORE_TABS, 'on')]).then(function(values) {
           if (disposed || workspaceTouched) return
@@ -7546,7 +7470,7 @@ export default {
       }
       Promise.resolve(storageGet(STORAGE_WORKSPACE_OPEN, 'closed')).then(function(state) {
         if (!disposed && !workspaceTouched && state === 'open') {
-          initialOpenTimer = setTimeout(openAfterPreviewRestore, 0)
+          initialOpenTimer = setTimeout(restoreWorkspaceTabs, 0)
         }
       }).catch(function(error) {
         reportPluginError('workspace state restore failed', error)
@@ -7576,10 +7500,9 @@ export default {
       stopConversationListener()
       if (imageDetailDialog) imageDetailDialog.close()
       openVaultTab = null
-      if (typeof document !== 'undefined') {
-        document.removeEventListener('click', trackTabSelection, true)
-        document.removeEventListener('focusin', trackTabSelection, true)
-      }
+      vaultTabs.forEach(function(tab) {
+        if (tab.visibilityStop) { tab.visibilityStop(); tab.visibilityStop = null }
+      })
       for (const tab of vaultTabs.values()) { try { tab.close() } catch {} }
       vaultTabs.clear()
     })
@@ -7628,11 +7551,6 @@ export default {
       data: {
         handler: attachVaultCapabilitiesToDraft,
       },
-    })
-    ctx.register({
-      id: 'context-reference-style',
-      area: COMPOSER_AREAS.underside,
-      render: contextReferenceStyles,
     })
     ctx.register({
       id: 'attach-active-note',

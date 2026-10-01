@@ -1,5 +1,15 @@
 # 0.4.7 release review
 
+## Post-review correction candidate — 2026-10-01
+
+This correction removes the Hermes transcript observer and text/attribute rewriting, drops the `<ide_opened_file>` wrapper, uses only Vault View's own tab as an optional workspace anchor, follows SDK pane visibility instead of listening to Hermes tab-strip DOM events, scopes remote-image toggling to Vault View roots, and localizes the remaining copy button, quote, link, image, and agent-context labels. The cosmetic tab-strip CSS was removed too. The version stays 0.4.7; the published tag is unchanged. The root and `desktop/` entry points remain identical because the documented direct disk install loads the root file while package installation uses `desktop/plugin.js`.
+
+The upstream `NousResearch/hermes-agent` main revision observed for this review was `34f8ec3b407e50bad3ae27e4cd79d65212061356`. Its pinned public SDK documentation, catalog admission policy, schema validator and Desktop surface lint source were inspected for disk/package entry points, SDK-only Desktop access, exact SHA pins, platform meaning and minimum Hermes version. The local Desktop lint copy matches the inspected rules and reported no findings. The standalone catalog validator could not run because `ruamel.yaml` is unavailable; the full `hermes plugins validate` command also remains unverified.
+
+`node tests/verify.cjs --browser` passed with Playwright/Chromium, including remote-image request and Markdown-source checks, locale-bundle parity, and source editing. This is browser harness evidence, not a live Hermes run. WSL gateway integration, native OS dispatch, actual installed-module reload, the standalone catalog validator and the full Hermes plugin validator were not run for this candidate. The PR pin, public release, index status, development push and running plugin must each be verified independently before any publication claim.
+
+Network inventory: remote Markdown image providers receive requests only after the separate persistent image opt-in; external Markdown links open a SandboxedFrame preview after a user click or use the operating-system external opener after a user click. Local note and image reads use the selected Hermes gateway; the plugin has no self-update or remote code loader. Draft inventory: the composer can add a capability pointer only after the separate persistent agent-guidance opt-in, active-note metadata only after its own sharing opt-in, and a note body only through the user's explicit attachment action. Both automatic opt-outs remove stale plugin attachments without deleting user attachments or note source.
+
 ## Verdict
 
 The candidate passes the automated checks listed in RELEASE-CHECKLIST.md. No unresolved security defect was identified in this review, but this is not a guarantee of absence of vulnerabilities or certification of every Hermes version. Manual validation remains partial, and native application dispatch has not been certified across all OS/backend configurations. These limitations are disclosed in the release documentation. Direct Obsidian opening is hidden and must not be advertised as working.
