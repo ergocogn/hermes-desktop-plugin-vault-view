@@ -6,14 +6,20 @@
 
 [English](README.md) · [Français](README.fr.md)
 
-[![Version v0.4.7](https://img.shields.io/badge/version-v0.4.7-2563eb)](https://github.com/ergocogn/hermes-desktop-plugin-vault-view/releases/tag/v0.4.7)
+[![Version v0.4.8](https://img.shields.io/badge/version-v0.4.8-2563eb)](https://github.com/ergocogn/hermes-desktop-plugin-vault-view/releases/tag/v0.4.8)
 [![Installer dans Hermes Desktop](https://img.shields.io/badge/Installer%20dans-Hermes%20Desktop-2563eb)](hermes://plugin/install?repo=ergocogn/hermes-desktop-plugin-vault-view)
 
 ![Vault View affichant une note Markdown liée, l’explorateur, le plan et le graphe dans Hermes Desktop](screenshots/vault-view-light.png)
 
 Vault View intègre votre base de connaissances Markdown à la conversation. Retrouvez une note, demandez à Hermes de la créer ou de la mettre à jour, suivez ses liens et gardez plusieurs notes ouvertes dans un espace conçu pour un vault plutôt que dans un simple aperçu de fichier.
 
-## Nouveautés de la version 0.4.7
+## Nouveautés de la version 0.4.8
+
+- Le plugin reste dans sa propre interface : suppression des accès au DOM de la transcription et des onglets Hermes. La sélection des onglets utilise l’API publique de visibilité.
+- Traduction en anglais et en français des derniers libellés de copie de code, encadrés, liens, images et contexte de l’agent.
+- Mise à jour des images distantes limitée à Vault View et conservation du point d’entrée pour l’installation directe.
+
+## Changements précédents de la version 0.4.7
 
 - Lecture fiable des longues notes et enregistrement vérifié.
 - Navigation accélérée avec caches bornés et lecture progressive.

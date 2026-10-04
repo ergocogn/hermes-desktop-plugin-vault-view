@@ -1,8 +1,16 @@
-# 0.4.7 release review
+# 0.4.8 release candidate review
 
-## Post-review correction candidate — 2026-10-01
+## 2026-10-04 candidate review
 
-This correction removes the Hermes transcript observer and text/attribute rewriting, drops the `<ide_opened_file>` wrapper, uses only Vault View's own tab as an optional workspace anchor, follows SDK pane visibility instead of listening to Hermes tab-strip DOM events, scopes remote-image toggling to Vault View roots, and localizes the remaining copy button, quote, link, image, and agent-context labels. The cosmetic tab-strip CSS was removed too. The version stays 0.4.7; the published tag is unchanged. The root and `desktop/` entry points remain identical because the documented direct disk install loads the root file while package installation uses `desktop/plugin.js`.
+Version 0.4.8 identifies the post-review correction separately from the published 0.4.7 tag. The reviewed base is public tag `v0.4.7` at `fc6068e72f14e71f6fd2c1a1a39c2cb72b9ff50d`; the release-candidate commit and tag are recorded in the publication handoff. The correction removes Hermes transcript and tab-strip DOM access, uses the public pane visibility API for Vault View tabs, confines remote-image updates to plugin roots and localizes the remaining labels. The two supported entry points stay byte-identical.
+
+The current official Hermes SDK documentation, catalog policy, catalog entry parser and Desktop lint were reviewed at upstream commit `8b66a51036c1e20920a17cdd049fdf55c968d683`. The current Desktop lint returned no findings for the candidate, and the catalog validator at that commit accepted the staged entry. The installed Hermes plugin validator (source commit `a510d6c64a61582688133b5f54c8191e190a1f49`) passed the candidate with the expected warning that the Python capability probe is skipped for a Desktop-only plugin. The full plugin validator at upstream `8b66a510` was not run. These checks are not admission approval.
+
+The browser-inclusive regression suite passed on Windows with Playwright/Chromium, including an actual click into progressive reading before Ctrl+F, remote-image request blocking and source preservation. A synthetic SDK harness verified workspace tab selection, hide/restore and listener cleanup. Synthetic WSL integration passed for Unicode read/write, real ffmpeg previews, private concurrent scans and installed gateway command classification. The running Hermes Desktop UI displayed v0.4.8; hiding and restoring Vault View left one note tab, without a duplicate. Clean install, application restart, draft preservation across reload, native application dispatch and cross-platform behavior remain unverified. No public push or release had occurred when this review was recorded.
+
+## Earlier 0.4.7 correction candidate — 2026-10-01
+
+The 1 October correction candidate removed the Hermes transcript observer and text/attribute rewriting, dropped the `<ide_opened_file>` wrapper, stopped reading the host tab strip, scoped remote-image toggling to Vault View roots and localized the remaining labels. It was initially labeled 0.4.7 and was not published; version 0.4.8 supersedes that candidate. The root and `desktop/` entry points remain identical because the documented direct disk install loads the root file while package installation uses `desktop/plugin.js`.
 
 The upstream `NousResearch/hermes-agent` main revision observed for this review was `34f8ec3b407e50bad3ae27e4cd79d65212061356`. Its pinned public SDK documentation, catalog admission policy, schema validator and Desktop surface lint source were inspected for disk/package entry points, SDK-only Desktop access, exact SHA pins, platform meaning and minimum Hermes version. The local Desktop lint copy matches the inspected rules and reported no findings. The standalone catalog validator could not run because `ruamel.yaml` is unavailable; the full `hermes plugins validate` command also remains unverified.
 

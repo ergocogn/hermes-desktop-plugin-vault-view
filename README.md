@@ -6,14 +6,20 @@
 
 [English](README.md) · [Français](README.fr.md)
 
-[![Release v0.4.7](https://img.shields.io/badge/release-v0.4.7-2563eb)](https://github.com/ergocogn/hermes-desktop-plugin-vault-view/releases/tag/v0.4.7)
+[![Release v0.4.8](https://img.shields.io/badge/release-v0.4.8-2563eb)](https://github.com/ergocogn/hermes-desktop-plugin-vault-view/releases/tag/v0.4.8)
 [![Install in Hermes Desktop](https://img.shields.io/badge/Install%20in-Hermes%20Desktop-2563eb)](hermes://plugin/install?repo=ergocogn/hermes-desktop-plugin-vault-view)
 
 ![Vault View displaying a linked Markdown note, explorer, outline, and graph inside Hermes Desktop](screenshots/vault-view-light.png)
 
 Vault View brings your Markdown knowledge base into the conversation. Find a note, ask Hermes to create or update it, follow its links, and keep several notes open in a workspace designed for a vault—not a generic file preview.
 
-## What is new in 0.4.7
+## What is new in 0.4.8
+
+- Keep the plugin inside its own UI root: remove Hermes transcript and tab-strip DOM access. Workspace tab selection uses the public SDK visibility atom.
+- Complete English and French labels for code copying, callouts, links, images and agent context.
+- Keep remote-image updates inside Vault View and preserve the plugin's direct-install entry point.
+
+## Previous changes in 0.4.7
 
 - SDK-sandboxed web previews, with Hermes >=0.21.5 required.
 - Separate agent navigation guidance and remote-image settings, both off by default.

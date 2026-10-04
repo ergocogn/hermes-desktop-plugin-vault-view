@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.8 - 2026-10-04
+
+### Fixed
+
+- Remove observation and rewriting of Hermes transcript nodes, stop inspecting the host tab strip, and use the public workspace visibility API for Vault View tabs.
+- Scope the remote-image preference update to Vault View roots and localize the remaining code-copy, callout, link, image and agent-context text in English and French.
+- Keep the direct-install and package entry points identical. No vault note migration or automatic content sharing is introduced.
+
 ## 0.4.7 - 2026-09-28
 
 ### Security and privacy

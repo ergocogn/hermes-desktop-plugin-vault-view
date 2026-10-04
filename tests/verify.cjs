@@ -7,7 +7,7 @@ if (args.some(arg => arg !== '--browser')) {
   process.exit(2)
 }
 const root = path.resolve(__dirname, '..')
-const suites = ['package', 'run-tests', 'catalog-policy', 'file-bytes', 'io-diagnostics', 'progressive-reading', 'attachment-opening', 'image-preview', 'image-boundary', 'scan-isolation']
+const suites = ['package', 'run-tests', 'catalog-policy', 'workspace-tabs', 'file-bytes', 'io-diagnostics', 'progressive-reading', 'attachment-opening', 'image-preview', 'image-boundary', 'scan-isolation']
 if (args.includes('--browser')) suites.push('editor-browser')
 const commands = [['--check', path.join(root, 'plugin.js')], ...suites.map(name => [path.join(__dirname, name + '.cjs')])]
 for (const command of commands) {

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react'
 
 const ID = 'vault-view'
 const NAME = 'Vault View'
-const VERSION = '0.4.7'
+const VERSION = '0.4.8'
 const VAULT_PATH_DEFAULT = ''
 const VAULT_ENV_KEY = 'WIKI_PATH'
 const STORAGE_VAULT_PATH = ID + ':vault-path'

@@ -75,7 +75,7 @@ assert.deepEqual(Array.from(api.filterVaultNotes(tagFiles, '/vault', '#project/p
 assert.deepEqual(Array.from(api.filterVaultNotes(tagFiles, '/vault', '#missing', tagContents)), [])
 assert.deepEqual(Array.from(api.filterVaultNotes(tagFiles, '/vault', 'project filename', tagContents)), [tagFiles[4]], 'ordinary filename search still works')
 assert.equal(api.ID, 'vault-view')
-assert.equal(api.VERSION, '0.4.7')
+assert.equal(api.VERSION, '0.4.8')
 assert.equal(api.validDetectedPath('/vault/'), '/vault')
 assert.equal(api.validDetectedPath('/vault\nsecret'), '')
 
