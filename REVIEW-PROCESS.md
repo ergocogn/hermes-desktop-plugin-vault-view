@@ -18,4 +18,4 @@ Before publishing, confirm entry-point parity, manifest and documentation versio
 
 ## Current reviewed upstream
 
-The 0.5.0 candidate was reviewed on 2026-10-07 against Hermes upstream commit `a50406d9b7474b060450d2dcaff8743c977d296a`. Exact validator results and checks not performed are recorded in RELEASE-REVIEW.md.
+The 0.5.0 candidate was reviewed on 2026-10-07 against Hermes upstream commit `808520532cf7c48c3eccb09476fb3cde379b02e9`. Exact validator results and checks not performed are recorded in RELEASE-REVIEW.md.
