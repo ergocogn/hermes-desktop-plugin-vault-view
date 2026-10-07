@@ -55,6 +55,53 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright')
     assert.match(edited, /modifie/)
     assert.doesNotMatch(edited, /- - Un/)
     console.log('Vault View browser editor: OK (heading, bold, lists, edit, no duplicate markers)')
+    const responsive = await page.evaluate(() => {
+      const shell = document.createElement('div')
+      shell.className = 'ov-root'
+      shell.style.width = '540px'
+      shell.style.height = '240px'
+      const content = document.createElement('section')
+      content.className = 'ov-content'
+      const toolbar = document.createElement('div')
+      toolbar.className = 'ov-toolbar'
+      for (let groupIndex = 0; groupIndex < 5; groupIndex += 1) {
+        const group = document.createElement('div')
+        group.className = 'ov-toolbar-group'
+        for (let index = 0; index < 4; index += 1) {
+          const button = document.createElement('button')
+          button.className = 'ov-button ov-icon-button'
+          group.appendChild(button)
+        }
+        toolbar.appendChild(group)
+      }
+      const formatbar = document.createElement('div')
+      formatbar.className = 'ov-formatbar'
+      content.append(toolbar, formatbar)
+      shell.appendChild(content)
+      document.body.appendChild(shell)
+      const narrow = {
+        toolbarWrap: getComputedStyle(toolbar).flexWrap,
+        formatWrap: getComputedStyle(formatbar).flexWrap,
+        formatOverflow: getComputedStyle(formatbar).overflowX,
+        groupsStayTogether: Array.from(toolbar.children).every(group => getComputedStyle(group).whiteSpace === 'nowrap'),
+      }
+      shell.style.width = '900px'
+      const wide = { toolbarWrap: getComputedStyle(toolbar).flexWrap, formatWrap: getComputedStyle(formatbar).flexWrap }
+      content.style.flex = '0 0 340px'
+      content.style.width = '340px'
+      const narrowedBySidebars = { toolbarWrap: getComputedStyle(toolbar).flexWrap, formatWrap: getComputedStyle(formatbar).flexWrap }
+      shell.remove()
+      return { narrow, wide, narrowedBySidebars }
+    })
+    assert.equal(responsive.narrow.toolbarWrap, 'wrap')
+    assert.equal(responsive.narrow.formatWrap, 'wrap')
+    assert.equal(responsive.narrow.formatOverflow, 'visible')
+    assert.equal(responsive.narrow.groupsStayTogether, true)
+    assert.equal(responsive.wide.toolbarWrap, 'nowrap')
+    assert.equal(responsive.wide.formatWrap, 'nowrap')
+    assert.equal(responsive.narrowedBySidebars.toolbarWrap, 'wrap', 'sidebars must trigger wrapping from the real center width')
+    assert.equal(responsive.narrowedBySidebars.formatWrap, 'wrap')
+    console.log('Vault View browser responsive UI: OK (container thresholds and grouped controls)')
     const preserved = await page.evaluate(() => {
       const root = document.getElementById('editor')
       const options = { currentPath: '/vault/test.md', vaultPath: '/vault', allFiles: [], allAssets: [] }
@@ -194,11 +241,12 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright')
       let value = 'conversation-a', listener, stopped = false
       const changed = []
       const stop = listenVaultConversationChanges({ focusedStoredSessionId: { get: () => value, listen: fn => { listener = fn; return () => { stopped = true } } } }, id => changed.push(id))
-      listener('conversation-a'); listener('conversation-b'); listener('conversation-b'); listener(null)
+      const emit = next => { value = next; listener() }
+      emit('conversation-a'); emit('conversation-b'); emit('conversation-b'); emit(null)
       stop()
       return { changed, stopped }
     })
-    assert.deepEqual(sessions.changed, ['conversation-b', null])
+    assert.deepEqual(sessions.changed, ['default::session:conversation-b', 'default::new'])
     assert.equal(sessions.stopped, true)
     console.log('Vault View browser image detail and conversations: OK (popup, zoom, original and session subscription)')
     await page.evaluate(() => {

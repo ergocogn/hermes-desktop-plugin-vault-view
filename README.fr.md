@@ -6,26 +6,32 @@
 
 [English](README.md) · [Français](README.fr.md)
 
-[![Version v0.4.8](https://img.shields.io/badge/version-v0.4.8-2563eb)](https://github.com/ergocogn/hermes-desktop-plugin-vault-view/releases/tag/v0.4.8)
+[![Version v0.5.0](https://img.shields.io/badge/version-v0.5.0-2563eb)](https://github.com/ergocogn/hermes-desktop-plugin-vault-view/releases/tag/v0.5.0)
 [![Installer dans Hermes Desktop](https://img.shields.io/badge/Installer%20dans-Hermes%20Desktop-2563eb)](hermes://plugin/install?repo=ergocogn/hermes-desktop-plugin-vault-view)
 
 ![Vault View affichant une note Markdown liée, l’explorateur, le plan et le graphe dans Hermes Desktop](screenshots/vault-view-light.png)
 
 Vault View intègre votre base de connaissances Markdown à la conversation. Retrouvez une note, demandez à Hermes de la créer ou de la mettre à jour, suivez ses liens et gardez plusieurs notes ouvertes dans un espace conçu pour un vault plutôt que dans un simple aperçu de fichier.
 
-## Nouveautés de la version 0.4.8
+## Nouveautés de la version 0.5.0
 
-- Le plugin reste dans sa propre interface : suppression des accès au DOM de la transcription et des onglets Hermes. La sélection des onglets utilise l’API publique de visibilité.
-- Traduction en anglais et en français des derniers libellés de copie de code, encadrés, liens, images et contexte de l’agent.
-- Mise à jour des images distantes limitée à Vault View et conservation du point d’entrée pour l’installation directe.
+- Un workspace facultatif par conversation conserve ses onglets ouverts et fermés, sa note active, la navigation, l’état d’édition, les aperçus et les brouillons. Plusieurs onglets peuvent rester épinglés globalement entre les conversations.
+- Une sélection explicite peut être citée dans la conversation Hermes active depuis la lecture, l’éditeur visuel ou la source Markdown. Cette action insère un bloc de citation sans conserver la sélection.
+- Une carte d’espace vide permet de créer ou d’ouvrir directement une note, et le bouton global Vault View reste disponible même sans note ouverte.
+- Les barres d’outils reviennent à la ligne selon la largeur réelle du panneau et les contrôles, menus, dialogues, focus et cartes utilisent les variables du thème Hermes.
+- L’ancien état des onglets est migré vers un stockage versionné des workspaces sans modifier les notes ni les pièces jointes.
 
-## Changements précédents de la version 0.4.7
+## Corrections précédentes de la revue catalogue en 0.4.8 et 0.4.7
 
+- Le plugin reste dans sa propre interface, utilise les API publiques de workspace et conserve son point d’entrée pour l’installation directe.
+- Les aperçus web utilisent le confinement du SDK et nécessitent Hermes >=0.21.5.
+- Le guidage de navigation de l’agent et les images distantes ont des réglages indépendants, tous deux désactivés par défaut.
+- Les erreurs, dialogues, messages de passerelle et valeurs de formatage sont disponibles en anglais et en français.
 - Lecture fiable des longues notes et enregistrement vérifié.
 - Navigation accélérée avec caches bornés et lecture progressive.
 - Mise en forme Markdown pendant l’édition, source préservée, recherche par tags et colonnes adaptatives.
 - Aperçus d’images différés, affichage en détail et aperçu des pièces jointes image/texte/code.
-- Onglets partagés entre conversations, annuler/rétablir et journal privé des pannes.
+- Onglets de notes partagés, annuler/rétablir et journal privé des pannes.
 
 Les miniatures utilisent ffmpeg si disponible, avec repli vers l’image originale. Le transport des fichiers nécessite des utilitaires Unix/WSL. L’ouverture directe dans Obsidian est temporairement masquée ; l’ouverture externe dépend de la configuration hôte/backend. La validation native des lancements Windows/macOS reste incomplète.
 
@@ -46,6 +52,9 @@ Voir [CHANGELOG.md](CHANGELOG.md) et le guide public de contribution pour les IA
 - Recherche, explorateur, plan, tags, backlinks, liens sortants et graphe du vault
 - Wikilinks, callouts Obsidian et images locales
 - Plusieurs onglets avec leur propre historique de navigation
+- Citation explicite d’un passage sélectionné vers la conversation active
+- Workspaces facultatifs par conversation (désactivés par défaut), avec plusieurs onglets épinglés globaux
+- Barres d’outils responsive selon la largeur réelle du panneau Vault View
 - Actualisation automatique après une modification par Hermes, Obsidian CLI ou un autre éditeur
 - Compatibilité avec les thèmes Hermes clairs et sombres
 - Interface en français, en anglais ou suivant automatiquement la langue de Hermes Desktop
@@ -86,7 +95,9 @@ Utilisez le dossier indiqué par Hermes Desktop. L’application Desktop et son 
 
 Vault View recherche automatiquement le vault déjà configuré dans Hermes par `WIKI_PATH`. Si aucun vault `.obsidian` valide n’est trouvé, sélectionnez sa racine dans les paramètres.
 
-Le réglage de langue propose **Suivre Hermes Desktop**, **English** et **Français**. Le même panneau permet de restaurer les onglets, de réinitialiser les panneaux et d’activer facultativement le partage de métadonnées sur la note active.
+Le réglage de langue propose **Suivre Hermes Desktop**, **English** et **Français**. Le même panneau permet de restaurer les onglets, d’activer les workspaces par conversation, de réinitialiser les panneaux et d’activer facultativement le partage de métadonnées sur la note active. Les workspaces par conversation sont désactivés par défaut ; une fois activés, chaque conversation conserve ses onglets ouverts ou fermés et ses brouillons, tandis que les onglets épinglés restent visibles partout.
+
+La sélection d’un texte dans une note active l’action de citation dans la barre supérieure et ajoute **Copier la sélection** et **Citer la sélection dans la conversation** au menu contextuel de la note. La citation résulte toujours d’une action explicite, cible la conversation Hermes actuellement active et la sélection n’est jamais stockée.
 
 ## Confidentialité
 

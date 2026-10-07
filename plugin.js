@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react'
 
 const ID = 'vault-view'
 const NAME = 'Vault View'
-const VERSION = '0.4.8'
+const VERSION = '0.5.0'
 const VAULT_PATH_DEFAULT = ''
 const VAULT_ENV_KEY = 'WIKI_PATH'
 const STORAGE_VAULT_PATH = ID + ':vault-path'
@@ -14,12 +14,22 @@ const STORAGE_ACTIVE_PATH = ID + ':active-path'
 const STORAGE_WORKSPACE_OPEN = ID + ':workspace-open'
 const STORAGE_TABS = ID + ':tabs'
 const STORAGE_RESTORE_TABS = ID + ':restore-tabs'
+const STORAGE_SESSION_WORKSPACES = ID + ':session-workspaces'
+const STORAGE_SESSION_WORKSPACES_ENABLED = ID + ':session-workspaces-enabled'
+const WORKSPACE_STORAGE_VERSION = 1
 const DEFAULT_TAB_ID = ID + ':workspace'
 const vaultTabs = new Map()
 const vaultActivityListeners = new Set()
+const workspacePreferenceListeners = new Set()
 let activeVaultTabId = DEFAULT_TAB_ID
 let openVaultTab = null
+let changeWorkspaceModeRuntime = null
 let browserTabSerial = 0
+let sessionWorkspacesEnabled = false
+let activeWorkspaceKey = 'global'
+let workspaceStorageReady = false
+const workspaceOpenState = new Map([['global', true]])
+const workspaceActiveTab = new Map()
 
 const LOCALES = {
   en: {
@@ -184,12 +194,12 @@ const LOCALES = {
     source: 'Configuration source', sourceEnvironment: 'Hermes environment (' + VAULT_ENV_KEY + ')', sourceManual: 'Manual selection', sourceNone: 'Not configured',
     vault: 'Vault', notConfigured: 'Not configured', cliTarget: 'Target unavailable', connection: 'Local connection', ready: 'Ready', initializing: 'Initializing…', required: 'Configuration required',
     shareContext: 'Share lightweight active-note metadata with the agent. Off by default; full note content remains a manual attachment.',
-    restoreTabs: 'Restore Vault View tabs on the next start.', layout: 'Panels', layoutHelp: 'Restore the original left and right panel sizes, show both panels, and reset the graph to the current note. Notes and tabs are not changed.', resetLayout: 'Restore panel sizes',
+    restoreTabs: 'Restore Vault View tabs on the next start.', sessionWorkspaces: 'Use a separate workspace for each conversation. Off by default.', sessionWorkspacesHelp: 'Open tabs, drafts and closed state follow the active conversation. Pinned tabs remain visible everywhere.', sessionWorkspaceActive: 'Session workspace active — open settings', sessionWorkspaceInactive: 'Session workspaces are off — open settings', layout: 'Panels', layoutHelp: 'Restore the original left and right panel sizes, show both panels, and reset the graph to the current note. Notes and tabs are not changed.', resetLayout: 'Restore panel sizes',
     language: 'Language', languageAuto: 'Follow Hermes Desktop', languageEnglish: 'English', languageFrench: 'Français', languageHelp: 'Follow the Hermes Desktop language automatically, or choose English or Français for Vault View.',
     about: NAME + ' v' + VERSION + ' · Local interface for Obsidian-compatible vaults.', configure: 'Configure Vault View',
     configureHelp: 'Vault View can use the vault already configured in Hermes, or a path you choose manually. It uses the path only to display notes locally.', openSettings: 'Open settings',
-    noNote: 'No note selected', vaultNotConfigured: 'Vault not configured', showVault: 'Show Vault View', toggleVault: 'Show or hide Vault View', openNote: 'Open a note…',
-    newTab: 'Open the note in a new tab', newNote: 'New note', newFolder: 'New folder', collapseAll: 'Collapse all', expandAll: 'Expand all', openNoteAction: 'Open a note', refreshVault: 'Refresh the vault',
+    noNote: 'No note selected', noNoteHelp: 'This workspace does not have an open note yet.', quoteSelection: 'Quote selection in the conversation', copySelection: 'Copy selection', pinNote: 'Pin tab across conversations', unpinNote: 'Unpin tab into this conversation', pinnedNote: 'Pinned across conversations', messageSelectPassageToQuote: 'Select a passage in the note first.', messageComposerUnavailableForQuote: 'The active conversation composer is unavailable. Your selection was retained.', vaultNotConfigured: 'Vault not configured', showVault: 'Show Vault View', toggleVault: 'Show or hide Vault View', openNote: 'Open a note…',
+    newTab: 'Open the note in a new tab', newNote: 'New note', createNote: 'Create a note', newFolder: 'New folder', collapseAll: 'Collapse all', expandAll: 'Expand all', openNoteAction: 'Open a note', refreshVault: 'Refresh the vault',
     vaultCounts: (folders, notes) => folders + ' folders, ' + notes + ' notes',
     hideExplorer: 'Hide explorer', showExplorer: 'Show explorer', refresh: 'Refresh note', saveBeforeRefresh: 'Save changes before refreshing the note',
     edit: 'Edit note', read: 'Switch to reading', saveAndRead: 'Save and switch to reading', contextOn: 'AI context on: identify the open note to the agent', contextOff: 'AI context off', enableContext: 'Enable AI context', disableContext: 'Disable AI context',
@@ -366,12 +376,12 @@ const LOCALES = {
     source: 'Source de configuration', sourceEnvironment: 'Environnement Hermes (' + VAULT_ENV_KEY + ')', sourceManual: 'Sélection manuelle', sourceNone: 'Non configuré',
     vault: 'Vault', notConfigured: 'Non configuré', cliTarget: 'Cible indisponible', connection: 'Connexion locale', ready: 'Prête', initializing: 'Initialisation…', required: 'Configuration requise',
     shareContext: 'Partager des métadonnées légères sur la note active avec l’agent. Désactivé par défaut ; le contenu intégral reste une pièce jointe manuelle.',
-    restoreTabs: 'Restaurer les onglets Vault View au prochain démarrage.', layout: 'Panneaux', layoutHelp: 'Rétablir la taille d’origine des panneaux gauche et droit, réafficher les deux panneaux et remettre le graphe sur la note actuelle. Les notes et les onglets ne sont pas modifiés.', resetLayout: 'Rétablir les panneaux',
+    restoreTabs: 'Restaurer les onglets Vault View au prochain démarrage.', sessionWorkspaces: 'Utiliser un workspace distinct pour chaque conversation. Désactivé par défaut.', sessionWorkspacesHelp: 'Les onglets, brouillons et états fermés suivent la conversation active. Les onglets épinglés restent visibles partout.', sessionWorkspaceActive: 'Workspace de session actif — ouvrir les paramètres', sessionWorkspaceInactive: 'Workspaces par session désactivés — ouvrir les paramètres', layout: 'Panneaux', layoutHelp: 'Rétablir la taille d’origine des panneaux gauche et droit, réafficher les deux panneaux et remettre le graphe sur la note actuelle. Les notes et les onglets ne sont pas modifiés.', resetLayout: 'Rétablir les panneaux',
     language: 'Langue', languageAuto: 'Suivre Hermes Desktop', languageEnglish: 'English', languageFrench: 'Français', languageHelp: 'Suivez automatiquement la langue de Hermes Desktop ou choisissez English ou Français pour Vault View.',
     about: NAME + ' v' + VERSION + ' · Interface locale pour les vaults compatibles avec Obsidian.', configure: 'Configurer Vault View',
     configureHelp: 'Vault View peut utiliser le vault déjà configuré dans Hermes ou un chemin choisi manuellement. Ce chemin sert uniquement à afficher les notes localement.', openSettings: 'Ouvrir les paramètres',
-    noNote: 'Aucune note sélectionnée', vaultNotConfigured: 'Vault non configuré', showVault: 'Afficher Vault View', toggleVault: 'Afficher ou masquer Vault View', openNote: 'Ouvrir une note…',
-    newTab: 'Ouvrir la note dans un nouvel onglet', newNote: 'Nouvelle note', newFolder: 'Nouveau dossier', collapseAll: 'Tout replier', expandAll: 'Tout déplier', openNoteAction: 'Ouvrir une note', refreshVault: 'Actualiser le vault',
+    noNote: 'Aucune note sélectionnée', noNoteHelp: 'Ce workspace ne contient encore aucune note ouverte.', quoteSelection: 'Citer la sélection dans la conversation', copySelection: 'Copier la sélection', pinNote: 'Épingler l’onglet entre les conversations', unpinNote: 'Désépingler l’onglet dans cette conversation', pinnedNote: 'Épinglé entre les conversations', messageSelectPassageToQuote: 'Sélectionnez d’abord un passage dans la note.', messageComposerUnavailableForQuote: 'Le compositeur de la conversation active est indisponible. La sélection a été conservée.', vaultNotConfigured: 'Vault non configuré', showVault: 'Afficher Vault View', toggleVault: 'Afficher ou masquer Vault View', openNote: 'Ouvrir une note…',
+    newTab: 'Ouvrir la note dans un nouvel onglet', newNote: 'Nouvelle note', createNote: 'Créer une note', newFolder: 'Nouveau dossier', collapseAll: 'Tout replier', expandAll: 'Tout déplier', openNoteAction: 'Ouvrir une note', refreshVault: 'Actualiser le vault',
     vaultCounts: (folders, notes) => folders + ' dossiers, ' + notes + ' notes',
     hideExplorer: 'Masquer l’explorateur', showExplorer: 'Afficher l’explorateur', refresh: 'Actualiser la note', saveBeforeRefresh: 'Enregistrer avant d’actualiser la note',
     edit: 'Éditer la note', read: 'Passer en lecture', saveAndRead: 'Enregistrer et passer en lecture', contextOn: 'Contexte IA actif : indiquer la note ouverte à l’agent', contextOff: 'Contexte IA inactif', enableContext: 'Activer le contexte IA', disableContext: 'Désactiver le contexte IA',
@@ -446,19 +456,108 @@ function useVaultI18n() {
   }, [hermesT, language])
 }
 
+function readHostAtom(atom, fallback = null) {
+  try { return atom && typeof atom.get === 'function' ? atom.get() : fallback } catch { return fallback }
+}
+
+function focusedWorkspaceIdentity(state = host && host.state) {
+  const profile = String(readHostAtom(state && (state.focusedSessionProfile || state.profile), 'default') || 'default')
+  const stored = readHostAtom(state && state.focusedStoredSessionId, null)
+  const runtime = readHostAtom(state && state.focusedSessionId, null)
+  if (stored) return profile + '::session:' + String(stored)
+  if (runtime) return profile + '::runtime:' + String(runtime)
+  return profile + '::new'
+}
+
+function formatSelectionQuote(value) {
+  const lines = String(value || '').replace(/\r\n?/g, '\n').split('\n')
+  while (lines.length && !lines[0].trim()) lines.shift()
+  while (lines.length && !lines[lines.length - 1].trim()) lines.pop()
+  if (!lines.length) return ''
+  return lines.map(function(line) { return line.trim() ? '> ' + line : '>' }).join('\n')
+}
+
+function resolveVaultActivePath(keepActive, scanned, preserveEmpty = false) {
+  const requested = normalizePath(keepActive || '')
+  if (requested && scanned.includes(requested)) return requested
+  return preserveEmpty ? '' : (scanned[0] || '')
+}
+
+async function insertSelectionQuote(value, state = host && host.state, composer = host && host.composer) {
+  const quote = formatSelectionQuote(value)
+  if (!quote || !composer || typeof composer.insertText !== 'function') return false
+  const sessionId = readHostAtom(state && state.focusedSessionId, null) || readHostAtom(state && state.focusedStoredSessionId, null)
+  return Boolean(await composer.insertText(sessionId || null, quote, { mode: 'block' }))
+}
+
+function validStoredTab(tab) {
+  if (!tab || typeof tab.tabId !== 'string') return null
+  if (tab.tabId !== DEFAULT_TAB_ID && !tab.tabId.startsWith(ID + ':tab:')) return null
+  const snapshot = tab.snapshot && typeof tab.snapshot === 'object' ? tab.snapshot : null
+  return {
+    tabId: tab.tabId,
+    path: normalizePath(tab.path || ''),
+    workspaceKey: typeof tab.workspaceKey === 'string' && tab.workspaceKey ? tab.workspaceKey : 'global',
+    pinned: Boolean(tab.pinned),
+    snapshot: snapshot,
+  }
+}
+
+function tabIsVisibleInWorkspace(tab, workspaceKey = activeWorkspaceKey) {
+  return Boolean(tab && (tab.pinned || (sessionWorkspacesEnabled ? tab.workspaceKey === workspaceKey : tab.workspaceKey === 'global')))
+}
+
+function setSessionWorkspacesEnabled(enabled, persist = true) {
+  sessionWorkspacesEnabled = Boolean(enabled)
+  if (persist) storageSet(STORAGE_SESSION_WORKSPACES_ENABLED, sessionWorkspacesEnabled ? 'on' : 'off')
+  workspacePreferenceListeners.forEach(function(listener) { listener(sessionWorkspacesEnabled) })
+}
+
+function serializeVaultTab(tab) {
+  return {
+    tabId: tab.tabId,
+    path: tab.path || '',
+    workspaceKey: tab.workspaceKey || 'global',
+    pinned: Boolean(tab.pinned),
+    snapshot: tab.snapshot || null,
+  }
+}
+
 function persistVaultTabs() {
-  const state = { activeTabId: activeVaultTabId, tabs: Array.from(vaultTabs.values()).map(function(tab) {
-    return { tabId: tab.tabId, path: tab.path || '' }
-  }) }
+  const allTabs = Array.from(vaultTabs.values()).map(serializeVaultTab)
+  const state = { activeTabId: activeVaultTabId, tabs: allTabs.map(function(tab) { return { tabId: tab.tabId, path: tab.path } }) }
   const signature = JSON.stringify(state)
-  if (persistVaultTabs.lastSignature === signature) return
-  persistVaultTabs.lastSignature = signature
-  storageSet(STORAGE_TABS, state)
+  if (persistVaultTabs.lastSignature !== signature) {
+    persistVaultTabs.lastSignature = signature
+    storageSet(STORAGE_TABS, state)
+  }
+  if (!workspaceStorageReady) return
+  const workspaces = {}
+  workspaceOpenState.forEach(function(open, key) { workspaces[key] = { open: Boolean(open), activeTabId: workspaceActiveTab.get(key) || '', tabs: [] } })
+  allTabs.forEach(function(tab) {
+    if (tab.pinned) return
+    const key = tab.workspaceKey || 'global'
+    if (!workspaces[key]) workspaces[key] = { open: true, activeTabId: '', tabs: [] }
+    workspaces[key].tabs.push(tab)
+    if (!workspaces[key].activeTabId && tab.tabId === activeVaultTabId) workspaces[key].activeTabId = tab.tabId
+  })
+  const next = {
+    version: WORKSPACE_STORAGE_VERSION,
+    activeWorkspaceKey: activeWorkspaceKey,
+    activeTabId: activeVaultTabId,
+    workspaces: workspaces,
+    pinnedTabs: allTabs.filter(function(tab) { return tab.pinned }),
+  }
+  const workspaceSignature = JSON.stringify(next)
+  if (persistVaultTabs.lastWorkspaceSignature === workspaceSignature) return
+  persistVaultTabs.lastWorkspaceSignature = workspaceSignature
+  storageSet(STORAGE_SESSION_WORKSPACES, next)
 }
 
 function selectVaultTab(tabId) {
   const tab = vaultTabs.get(tabId)
   if (!tab) return
+  if (!tab.pinned) workspaceActiveTab.set(tab.workspaceKey || 'global', tabId)
   if (activeVaultTabId === tabId) return
   activeVaultTabId = tabId
   vaultSessionContext = tab.context || { activePath: '', shareWithAgent: false }
@@ -469,7 +568,7 @@ function selectVaultTab(tabId) {
 }
 
 function vaultTabInventory(vaultPath = '') {
-  return Array.from(vaultTabs.values()).map(function(tab) {
+  return Array.from(vaultTabs.values()).filter(function(tab) { return tabIsVisibleInWorkspace(tab) }).map(function(tab) {
     return { tabId: tab.tabId, path: tab.path && vaultPath ? relativeToRoot(vaultPath, tab.path) : '', active: tab.tabId === activeVaultTabId, dirty: Boolean(tab.context && tab.context.dirty) }
   })
 }
@@ -3606,22 +3705,24 @@ function LoadingIndicator({ label = 'Chargement en cours' }) {
 function styles() {
   return jsx('style', {
     children: [
-      '.ov-root{height:100%;display:flex;min-height:0;position:relative;color:var(--foreground);background:var(--ui-bg-editor);font-size:12px;container-name:ovvault;container-type:inline-size;}',
+      '.ov-root{height:100%;display:flex;min-height:0;position:relative;color:var(--ui-text-primary,var(--foreground));background:var(--ui-editor-surface-background,var(--ui-bg-editor));font-family:var(--dt-font-sans,var(--theme-font-sans,system-ui,sans-serif));font-size:calc(var(--dt-base-size,1rem)*.75);line-height:var(--dt-line-height,1.5);letter-spacing:var(--dt-letter-spacing,0);container-name:ovvault;container-type:inline-size;}',
       '.ov-sidebar{height:100%;min-width:170px;max-width:420px;flex:0 0 auto;display:flex;flex-direction:column;border-right:1px solid var(--ui-stroke-secondary);min-height:0;overflow:hidden;background:var(--ui-bg-sidebar);}',
       '.ov-resizer{width:4px;margin-left:-2px;cursor:col-resize;position:relative;z-index:2;}',
       '.ov-resizer:hover{box-shadow:inset 1px 0 var(--ui-accent);}',
       '.ov-right-resizer{width:5px;margin-right:-2px;cursor:col-resize;position:relative;z-index:2;border-left:1px solid var(--ui-stroke-secondary);box-sizing:border-box;}',
       '.ov-right-resizer:hover{border-left-color:var(--ui-accent);}',
-      '.ov-content{flex:1;min-width:0;height:100%;display:flex;flex-direction:column;min-height:0;}',
-      '.ov-toolbar{display:flex;align-items:center;gap:6px;min-height:42px;padding:5px 10px;border-bottom:1px solid var(--ui-stroke-secondary);box-sizing:border-box;}',
+      '.ov-content{flex:1;min-width:0;height:100%;display:flex;flex-direction:column;min-height:0;container-name:ovcontent;container-type:inline-size;}',
+      '.ov-toolbar{display:flex;align-items:center;align-content:center;gap:calc(6px*var(--dt-spacing-mul,1));min-height:42px;padding:calc(6px*var(--dt-spacing-mul,1)) calc(10px*var(--dt-spacing-mul,1));border-bottom:1px solid var(--ui-stroke-secondary);box-sizing:border-box;background:var(--ui-editor-surface-background,var(--ui-bg-editor));}',
+      '.ov-toolbar-group{display:flex;align-items:center;gap:5px;flex:0 0 auto;white-space:nowrap;}',
       '.ov-sidebar-head{display:flex;align-items:center;gap:5px;min-height:42px;padding:5px 8px;border-bottom:1px solid var(--ui-stroke-secondary);box-sizing:border-box;}',
       '.ov-sidebar-title{font-size:11px;font-weight:600;text-transform:uppercase;color:var(--ui-text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
-      '.ov-title{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
+      '.ov-title{font-weight:600;min-width:0;overflow-wrap:anywhere;}',
       '.ov-loading-indicator{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;flex:none;color:var(--ui-text-tertiary);}',
       '.ov-loading-indicator>*{animation:ov-loading-spin 1.2s linear infinite;}',
       '@keyframes ov-loading-spin{to{transform:rotate(360deg);}}',
       '@media(prefers-reduced-motion:reduce){.ov-loading-indicator>*{animation:none;}}',
-      '.ov-note-title-panel{padding:14px clamp(12px,2vw,24px) 10px;border-bottom:1px solid var(--ui-stroke-secondary);box-sizing:border-box;}',
+      '.ov-note-title-panel{padding:16px clamp(12px,2vw,24px) 11px;border-bottom:1px solid var(--ui-stroke-secondary);box-sizing:border-box;transition:background .15s ease,border-color .15s ease;}',
+      '.ov-note-title-panel[data-pinned="true"]{border-bottom-color:color-mix(in srgb,var(--ui-accent) 52%,var(--ui-stroke-secondary));background:color-mix(in srgb,var(--ui-accent) 5%,transparent);}',
       '.ov-note-title-inner{width:100%;display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:12px;align-items:start;}',
       '.ov-note-title-input{grid-column:1;grid-row:1;}.ov-note-folder{grid-column:1;grid-row:2;}.ov-note-properties{grid-column:1/-1;}',
       '.ov-note-status{grid-column:2;grid-row:1;align-self:center;display:flex;align-items:center;justify-content:center;width:26px;height:26px;color:var(--ui-text-secondary);}',
@@ -3630,25 +3731,30 @@ function styles() {
       '.ov-note-properties pre{white-space:pre-wrap;overflow-wrap:anywhere;margin:6px 0 0;font-size:11px;}',
       '.ov-active-markdown{white-space:pre-wrap;overflow-wrap:anywhere;font-family:inherit;font-size:inherit;line-height:1.7;padding:0;margin:0 0 1em;color:var(--ui-text-primary);}',
       '.ov-md-marker{color:var(--ui-text-secondary);font-weight:400;opacity:.7;}',
-      '.ov-source-bold{font-weight:700;}.ov-source-italic{font-style:italic;}.ov-source-code{font-family:monospace;background:var(--ui-background-secondary);}',
+      '.ov-source-bold{font-weight:700;}.ov-source-italic{font-style:italic;}.ov-source-code{font-family:var(--dt-font-mono,var(--theme-font-mono,monospace));background:var(--ui-inline-code-background,var(--ui-bg-secondary));}',
       '.ov-active-markdown[data-heading-level="1"]{font-size:2em;font-weight:700;}.ov-active-markdown[data-heading-level="2"]{font-size:1.5em;font-weight:700;}.ov-active-markdown[data-heading-level="3"]{font-size:1.25em;font-weight:700;}.ov-active-markdown[data-heading-level="4"],.ov-active-markdown[data-heading-level="5"],.ov-active-markdown[data-heading-level="6"]{font-weight:700;}',
-      '.ov-icon-button[aria-pressed="true"]{background:color-mix(in srgb,var(--ui-text-primary) 12%,transparent);color:var(--ui-text-primary);box-shadow:inset 0 -2px var(--ui-text-primary);}',
+      '.ov-icon-button[aria-pressed="true"]{background:var(--ui-control-active-background,color-mix(in srgb,var(--ui-text-primary) 12%,transparent));color:var(--ui-text-primary);box-shadow:inset 0 -2px var(--ui-accent);}',
       '.ov-md img[data-image-state="error"]{cursor:pointer;min-height:32px;outline:1px dashed var(--ui-stroke-secondary);}',
       '.ov-note-title-input{display:block;width:100%;box-sizing:border-box;border:0;border-bottom:1px solid transparent;outline:0;background:transparent;color:var(--foreground);padding:0 0 3px;font-family:inherit;font-size:26px;font-weight:700;line-height:1.25;letter-spacing:0;}',
       '.ov-note-title-input:hover{border-bottom-color:var(--ui-stroke-secondary);}',
       '.ov-note-title-input:focus{border-bottom-color:var(--ui-accent);}',
       '.ov-note-title-input:disabled{color:var(--ui-text-tertiary);}',
-      '.ov-note-folder{margin-top:3px;color:var(--ui-text-tertiary);font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
+      '.ov-note-folder{margin-top:4px;color:var(--ui-text-tertiary);font-size:10px;overflow-wrap:anywhere;line-height:1.45;}',
+      '.ov-pinned-label{display:inline-flex;align-items:center;gap:4px;margin-left:8px;color:var(--ui-accent);font-weight:600;}',
       '.ov-muted{color:var(--ui-text-tertiary);}',
       '.ov-secondary{color:var(--ui-text-secondary);}',
       '.ov-grow{flex:1;min-width:0;}',
       '.ov-update-status{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ui-accent);font-size:12px;}',
-      '.ov-button{height:28px;border:1px solid var(--ui-stroke-secondary);color:var(--foreground);background:transparent;border-radius:5px;padding:3px 8px;font:inherit;cursor:pointer;white-space:nowrap;}',
+      '.ov-button{min-height:28px;border:1px solid var(--ui-stroke-secondary);color:var(--ui-text-primary,var(--foreground));background:transparent;border-radius:var(--radius-md,5px);padding:calc(4px*var(--dt-spacing-mul,1)) calc(9px*var(--dt-spacing-mul,1));font:inherit;cursor:pointer;white-space:nowrap;transition:background .12s ease,border-color .12s ease,color .12s ease,box-shadow .12s ease;}',
       '.ov-icon-button{width:28px;min-width:28px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-color:transparent;}',
-      '.ov-button:hover,.ov-format-button:hover,.ov-tree-item:hover,.ov-picker-row:hover{border-color:var(--ui-accent);color:var(--ui-accent);}',
+      '.ov-button:hover,.ov-format-button:hover{border-color:var(--ui-stroke-primary,var(--ui-accent));background:var(--ui-control-hover-background,var(--chrome-action-hover));color:var(--ui-text-primary,var(--foreground));}',
+      '.ov-tree-item:hover,.ov-picker-row:hover{border-color:var(--ui-stroke-primary,var(--ui-accent));background:var(--ui-row-hover-background,var(--ui-control-hover-background));color:var(--ui-text-primary,var(--foreground));}',
+      '.ov-button:focus-visible,.ov-format-button:focus-visible,.ov-tree-item:focus-visible,.ov-context-item:focus-visible,.ov-picker-row:focus-visible{outline:2px solid var(--dt-ring,var(--ui-accent));outline-offset:2px;}',
       '.ov-button:disabled,.ov-format-button:disabled{cursor:default;color:var(--ui-text-tertiary);border-color:transparent;}',
-      '.ov-input{width:100%;height:28px;box-sizing:border-box;border:1px solid var(--ui-stroke-secondary);background:var(--ui-bg-input);color:var(--foreground);border-radius:5px;padding:4px 7px;font:inherit;outline:0;}',
-      '.ov-input:focus{border-color:var(--ui-accent);}',
+      '.ov-primary-button{display:inline-flex;align-items:center;justify-content:center;gap:7px;border-color:var(--dt-primary-solid,var(--ui-accent));background:var(--dt-primary-solid,var(--ui-accent));color:var(--dt-primary-solid-foreground,var(--ui-bg-primary));font-weight:600;}',
+      '.ov-primary-button:hover{border-color:var(--dt-primary,var(--ui-accent));background:var(--dt-primary,var(--ui-accent));color:var(--dt-primary-foreground,var(--foreground));}',
+      '.ov-input{width:100%;height:28px;box-sizing:border-box;border:1px solid var(--dt-input-border,var(--ui-stroke-secondary));background:var(--dt-input-bg,var(--ui-bg-input));color:var(--ui-text-primary,var(--foreground));border-radius:var(--radius-md,5px);padding:4px 7px;font:inherit;outline:0;}',
+      '.ov-input:focus{border-color:var(--dt-ring,var(--ui-accent));box-shadow:0 0 0 1px var(--dt-ring,var(--ui-accent));}',
       '.ov-search-wrap{padding:7px 8px 5px;display:flex;gap:5px;position:relative;}',
       '.ov-search-wrap>.ov-input{padding-right:30px;min-width:0;}',
       '.ov-search-clear{position:absolute;right:12px;top:50%;transform:translateY(-50%);width:22px;height:22px;padding:0;display:flex;align-items:center;justify-content:center;border:0;background:transparent;color:var(--ui-text-tertiary);cursor:pointer;}',
@@ -3665,29 +3771,29 @@ function styles() {
       '.ov-tree-branch{margin-left:8px;border-left:1px solid var(--ui-stroke-secondary);}',
       '.ov-tree-row{display:flex;align-items:center;min-height:25px;min-width:0;}',
       '.ov-tree-drop{outline:2px solid var(--ui-accent);outline-offset:-2px;color:var(--ui-accent);background:color-mix(in srgb,var(--ui-accent) 10%,transparent);}',
-      '.ov-tree-item{width:100%;height:25px;display:flex;align-items:center;gap:5px;border:1px solid transparent;background:transparent;color:var(--ui-text-secondary);border-radius:4px;padding:2px 5px;font:inherit;text-align:left;cursor:pointer;min-width:0;}',
+      '.ov-tree-item{width:100%;height:25px;display:flex;align-items:center;gap:5px;border:1px solid transparent;background:transparent;color:var(--ui-text-secondary);border-radius:var(--radius-sm,4px);padding:2px 5px;font:inherit;text-align:left;cursor:pointer;min-width:0;}',
       '.ov-tree-item[aria-disabled="true"]{cursor:default;color:var(--ui-text-tertiary);}',
       '.ov-tree-chevron{width:12px;min-width:12px;display:inline-flex;align-items:center;justify-content:center;color:var(--ui-text-tertiary);}',
       '.ov-tree-icon{width:14px;min-width:14px;display:inline-flex;align-items:center;justify-content:center;color:var(--ui-text-tertiary);}',
       '.ov-tree-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
-      '.ov-tree-active{color:var(--foreground);box-shadow:inset 2px 0 var(--ui-accent);font-weight:600;}',
-      '.ov-context-menu{position:fixed;inset:auto;margin:0;z-index:80;width:218px;max-width:calc(100vw - 16px);max-height:calc(100vh - 16px);overflow:auto;box-sizing:border-box;padding:5px;border:1px solid var(--ui-stroke-secondary);border-radius:6px;background:var(--ui-bg-elevated);box-shadow:0 8px 22px color-mix(in srgb,var(--foreground) 18%,transparent);}',
-      '.ov-context-item{width:100%;height:29px;display:flex;align-items:center;gap:8px;border:0;border-radius:4px;padding:3px 7px;background:transparent;color:var(--foreground);font:inherit;text-align:left;cursor:pointer;}',
-      '.ov-context-item:hover{color:var(--ui-accent);box-shadow:inset 2px 0 var(--ui-accent);}',
-      '.ov-context-item-danger{color:var(--ui-text-secondary);}',
+      '.ov-tree-active{color:var(--ui-text-primary,var(--foreground));background:var(--ui-row-active-background,transparent);box-shadow:inset 2px 0 var(--ui-accent);font-weight:600;}',
+      '.ov-context-menu{position:fixed;inset:auto;margin:0;z-index:80;width:min(218px,calc(100vw - 16px));max-height:calc(100vh - 16px);overflow:auto;box-sizing:border-box;padding:6px;border:1px solid var(--ui-stroke-secondary);border-radius:var(--radius-lg,9px);background:var(--ui-widget-surface-background,var(--ui-bg-elevated));box-shadow:var(--shadow-md,0 12px 30px color-mix(in srgb,var(--foreground) 20%,transparent));}',
+      '.ov-context-item{width:100%;height:29px;display:flex;align-items:center;gap:8px;border:0;border-radius:var(--radius-sm,4px);padding:3px 7px;background:transparent;color:var(--foreground);font:inherit;text-align:left;cursor:pointer;}',
+      '.ov-context-item:hover{color:var(--ui-text-primary,var(--foreground));background:var(--ui-row-hover-background,var(--ui-control-hover-background));box-shadow:inset 2px 0 var(--ui-accent);}',
+      '.ov-context-item-danger{color:var(--ui-red,var(--dt-destructive,var(--ui-text-secondary)));}',
       '.ov-context-icon{width:15px;min-width:15px;display:inline-flex;justify-content:center;}',
       '.ov-context-separator{display:block;height:1px;margin:4px 3px;background:var(--ui-stroke-secondary);}',
       '.ov-tagbar{display:flex;gap:6px;flex-wrap:wrap;padding:8px clamp(12px,2vw,24px);border-top:1px solid var(--ui-stroke-secondary);}',
-      '.ov-tag{border:1px solid var(--ui-accent);background:color-mix(in srgb,var(--ui-accent) 10%,transparent);border-radius:8px;padding:2px 6px;color:var(--ui-accent);font:inherit;cursor:pointer;}',
-      '.ov-formatbar{display:flex;align-items:center;gap:2px;min-height:36px;padding:3px 10px;border-bottom:1px solid var(--ui-stroke-secondary);box-sizing:border-box;overflow-x:auto;}',
-      '.ov-format-button{width:29px;min-width:29px;height:28px;display:inline-flex;align-items:center;justify-content:center;border:1px solid transparent;border-radius:4px;background:transparent;color:var(--ui-text-secondary);font:inherit;cursor:pointer;}',
+      '.ov-tag{border:1px solid var(--ui-accent);background:color-mix(in srgb,var(--ui-accent) 10%,transparent);border-radius:var(--radius-lg,8px);padding:2px 6px;color:var(--ui-accent);font:inherit;cursor:pointer;}',
+      '.ov-formatbar{display:flex;align-items:center;gap:2px;min-height:36px;padding:4px 10px;border-bottom:1px solid var(--ui-stroke-secondary);box-sizing:border-box;overflow-x:auto;}',
+      '.ov-format-button{width:29px;min-width:29px;height:28px;display:inline-flex;align-items:center;justify-content:center;border:1px solid transparent;border-radius:var(--radius-sm,4px);background:transparent;color:var(--ui-text-secondary);font:inherit;cursor:pointer;}',
       '.ov-format-save-dirty{color:var(--ui-accent);border-color:var(--ui-accent);background:color-mix(in srgb,var(--ui-accent) 12%,transparent);}',
       '.ov-format-live{width:auto;padding:0 7px;gap:5px;}',
       '.ov-format-active{color:var(--ui-accent);border-color:var(--ui-accent);}',
       '.ov-format-modes{margin-left:auto;display:flex;align-items:center;gap:2px;}',
       '.ov-format-spacer{flex:1;min-width:10px;}',
       '.ov-format-mode{width:auto;min-width:56px;padding:0 7px;gap:5px;}',
-      '.ov-mode-toggle{height:28px;display:flex;align-items:stretch;border:1px solid var(--ui-stroke-secondary);border-radius:5px;overflow:hidden;}',
+      '.ov-mode-toggle{height:28px;display:flex;align-items:stretch;border:1px solid var(--ui-stroke-secondary);border-radius:var(--radius-md,5px);overflow:hidden;}',
       '.ov-mode-button{width:28px;min-width:28px;border:0;border-right:1px solid var(--ui-stroke-secondary);background:transparent;color:var(--ui-text-secondary);padding:0;display:flex;align-items:center;justify-content:center;font:inherit;cursor:pointer;}',
       '.ov-mode-button:last-child{border-right:0;}',
       '.ov-mode-button:hover,.ov-mode-button-active{color:var(--ui-accent);box-shadow:inset 0 -2px var(--ui-accent);}',
@@ -3699,7 +3805,7 @@ function styles() {
       '.ov-save-conflict{padding:12px 18px;border-bottom:1px solid var(--ui-accent);font-size:12px;}',
       '.ov-save-conflict p{margin:6px 0;}',
       '.ov-conflict-columns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0;}',
-      '.ov-conflict-columns textarea{width:100%;height:160px;resize:vertical;box-sizing:border-box;background:var(--ui-bg-primary);color:var(--foreground);border:1px solid var(--ui-stroke-secondary);font-family:monospace;}',
+      '.ov-conflict-columns textarea{width:100%;height:160px;resize:vertical;box-sizing:border-box;background:var(--ui-bg-primary);color:var(--foreground);border:1px solid var(--ui-stroke-secondary);font-family:var(--dt-font-mono,var(--theme-font-mono,monospace));}',
       '.ov-reading-page{content-visibility:auto;contain-intrinsic-size:auto 600px;}',
       '.ov-reading-page .ov-md{padding-top:8px;padding-bottom:8px;}',
       '.ov-reading-more{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px;padding:20px;font-size:12px;color:var(--ui-text-secondary);}',
@@ -3713,14 +3819,14 @@ function styles() {
       '.ov-visual-wrap{min-height:100%;position:relative;}',
       '.ov-visual-editor{min-height:100%;outline:0;cursor:text;}',
       '.ov-visual-editor:focus{box-shadow:inset 2px 0 var(--ui-accent);}',
-      '.ov-wiki-suggest{position:absolute;z-index:5;width:250px;max-height:230px;overflow:auto;border:1px solid var(--ui-stroke-secondary);border-radius:6px;padding:4px;background:var(--ui-bg-elevated);box-sizing:border-box;}',
-      '.ov-wiki-suggest-row{width:100%;height:29px;display:flex;align-items:center;gap:6px;border:1px solid transparent;border-radius:4px;background:transparent;color:var(--ui-text-secondary);padding:3px 6px;font:inherit;text-align:left;cursor:pointer;}',
+      '.ov-wiki-suggest{position:absolute;z-index:5;width:250px;max-height:230px;overflow:auto;border:1px solid var(--ui-stroke-secondary);border-radius:var(--radius-lg,6px);padding:4px;background:var(--ui-bg-elevated);box-sizing:border-box;}',
+      '.ov-wiki-suggest-row{width:100%;height:29px;display:flex;align-items:center;gap:6px;border:1px solid transparent;border-radius:var(--radius-sm,4px);background:transparent;color:var(--ui-text-secondary);padding:3px 6px;font:inherit;text-align:left;cursor:pointer;}',
       '.ov-wiki-suggest-row:hover,.ov-wiki-suggest-active{border-color:var(--ui-accent);color:var(--ui-accent);}',
       '.ov-wiki-suggest-row span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
       '.ov-right-sidebar{height:100%;min-width:240px;max-width:520px;flex:0 0 auto;display:flex;flex-direction:column;min-height:0;overflow:hidden;background:var(--ui-bg-sidebar);border-left:1px solid var(--ui-stroke-secondary);}',
       '.ov-side-head{display:flex;align-items:center;min-height:36px;border-bottom:1px solid var(--ui-stroke-secondary);}',
       '.ov-side-tabs{flex:1;min-width:0;height:36px;display:flex;align-items:stretch;}',
-      '.ov-side-tab{flex:1;min-width:0;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--ui-text-tertiary);padding:0 4px;font:10px/1 system-ui,sans-serif;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
+      '.ov-side-tab{flex:1;min-width:0;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--ui-text-tertiary);padding:0 4px;font:10px/1 var(--dt-font-sans,var(--theme-font-sans,system-ui,sans-serif));cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
       '.ov-side-tab:hover{color:var(--ui-accent);}',
       '.ov-side-tab-active{color:var(--foreground);border-bottom-color:var(--ui-accent);}',
       '.ov-side-content{flex:1;min-height:0;overflow:auto;padding:8px 7px 12px;}',
@@ -3736,10 +3842,18 @@ function styles() {
       '.ov-side-link-missing{cursor:default;color:var(--ui-text-tertiary);}',
       '.ov-side-link-missing:hover{color:var(--ui-text-tertiary);}',
       '.ov-side-tags{display:flex;flex-wrap:wrap;gap:5px;padding:1px 5px 5px;}',
-      '.ov-side-tag{border:1px solid var(--ui-accent);border-radius:8px;padding:1px 5px;color:var(--ui-accent);line-height:1.5;}',
+      '.ov-side-tag{border:1px solid var(--ui-accent);border-radius:var(--radius-lg,8px);padding:1px 5px;color:var(--ui-accent);line-height:1.5;}',
       '.ov-panel-view{flex:1;min-height:0;overflow:auto;padding:24px clamp(12px,2vw,24px);box-sizing:border-box;}',
-      '.ov-textarea{width:100%;height:100%;box-sizing:border-box;resize:none;border:0;outline:0;background:transparent;color:var(--foreground);font:13px/1.65 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;tab-size:4;}',
-      '.ov-source-read{min-height:100%;box-sizing:border-box;margin:0;padding:22px clamp(12px,2vw,24px);white-space:pre-wrap;overflow-wrap:anywhere;color:var(--foreground);background:color-mix(in srgb,var(--ui-stroke-secondary) 28%,transparent);font:13px/1.65 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;tab-size:4;}',
+      '.ov-empty-state{height:100%;display:flex;align-items:center;justify-content:center;padding:clamp(18px,5vw,48px);box-sizing:border-box;}',
+      '.ov-empty-card{width:min(460px,100%);padding:clamp(22px,4vw,34px);text-align:center;border:1px solid var(--ui-stroke-secondary);border-radius:var(--radius-xl,14px);background:var(--ui-bg-card);box-shadow:var(--shadow-sm,0 10px 28px color-mix(in srgb,var(--foreground) 8%,transparent));}',
+      '.ov-empty-icon{width:44px;height:44px;margin:0 auto 13px;display:flex;align-items:center;justify-content:center;border-radius:var(--radius-xl,12px);color:var(--ui-accent);background:color-mix(in srgb,var(--ui-accent) 12%,transparent);}',
+      '.ov-empty-card h2{margin:0 0 7px;font-size:18px;}.ov-empty-card p{margin:0;color:var(--ui-text-secondary);line-height:1.55;}',
+      '.ov-empty-actions{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px;margin-top:18px;}',
+      '.ov-empty-create-form{display:flex;align-items:center;gap:8px;margin-top:14px;text-align:left;}',
+      '.ov-empty-create-form .ov-input{height:34px;min-width:0;}',
+      '@container vault-view (max-width:560px){.ov-empty-create-form{flex-wrap:wrap}.ov-empty-create-form .ov-input{flex-basis:100%}}',
+      '.ov-textarea{width:100%;height:100%;box-sizing:border-box;resize:none;border:0;outline:0;background:transparent;color:var(--foreground);font:13px/1.65 var(--dt-font-mono,var(--theme-font-mono,ui-monospace,monospace));tab-size:4;}',
+      '.ov-source-read{min-height:100%;box-sizing:border-box;margin:0;padding:22px clamp(12px,2vw,24px);white-space:pre-wrap;overflow-wrap:anywhere;color:var(--foreground);background:color-mix(in srgb,var(--ui-stroke-secondary) 28%,transparent);font:13px/1.65 var(--dt-font-mono,var(--theme-font-mono,ui-monospace,monospace));tab-size:4;}',
       '.ov-md{width:100%;margin:0;padding:26px clamp(12px,2vw,24px) 36px;font-size:14px;line-height:1.7;box-sizing:border-box;-webkit-user-select:text!important;user-select:text!important;cursor:text;}',
       '.ov-md *{-webkit-user-select:text!important;user-select:text!important;}',
       '.ov-md h1,.ov-md h2,.ov-md h3,.ov-md h4,.ov-md h5,.ov-md h6{margin:1.35em 0 .5em;color:var(--foreground);line-height:1.25;font-weight:650;}',
@@ -3756,7 +3870,7 @@ function styles() {
       '.ov-md .ov-task-item>input{position:absolute;left:-1.6em;top:.35em;margin:0;accent-color:var(--ui-accent);}',
       '.ov-md li>ul,.ov-md li>ol{margin:.25em 0;}',
       '.ov-md blockquote{margin:1em 0;padding:1px 0 1px 14px;border-left:3px solid var(--ui-stroke-secondary);color:var(--ui-text-secondary);}',
-      '.ov-md .ov-callout{margin:1.1em 0;padding:13px 16px;border:1px solid var(--ui-stroke-secondary);border-left:4px solid var(--ui-accent);border-radius:6px;background:color-mix(in srgb,var(--ui-accent) 9%,transparent);color:var(--foreground);}',
+      '.ov-md .ov-callout{margin:1.1em 0;padding:13px 16px;border:1px solid var(--ui-stroke-secondary);border-left:4px solid var(--ui-accent);border-radius:var(--radius-lg,6px);background:color-mix(in srgb,var(--ui-accent) 9%,transparent);color:var(--foreground);}',
       '.ov-md .ov-callout-title{display:flex;align-items:center;gap:7px;color:var(--ui-accent);font-weight:650;line-height:1.35;}',
       '.ov-md .ov-callout-icon{width:16px;min-width:16px;text-align:center;font-size:15px;}',
       '.ov-md .ov-callout-body{margin-top:8px;}',
@@ -3769,12 +3883,12 @@ function styles() {
       '.ov-md a{color:var(--ui-accent);cursor:pointer;text-decoration:none;}',
       '.ov-md a:hover{text-decoration:underline;}',
       '.ov-md .ov-md-missing{color:var(--ui-text-tertiary);}',
-      '.ov-md .ov-md-tag{display:inline-block;border:1px solid var(--ui-accent);border-radius:8px;color:var(--ui-accent);padding:0 5px;line-height:1.45;}',
+      '.ov-md .ov-md-tag{display:inline-block;border:1px solid var(--ui-accent);border-radius:var(--radius-lg,8px);color:var(--ui-accent);padding:0 5px;line-height:1.45;}',
       '.ov-visual-editor .ov-md-tag,.ov-source-tag{color:var(--ui-accent);opacity:1;border:0;padding:0;}',
-      '.ov-md pre{position:relative;border:1px solid var(--ui-stroke-secondary);border-radius:6px;padding:10px 42px 10px 10px;overflow:auto;background:color-mix(in srgb,var(--ui-stroke-secondary) 38%,transparent);}',
+      '.ov-md pre{position:relative;border:1px solid var(--ui-stroke-secondary);border-radius:var(--radius-lg,6px);padding:10px 42px 10px 10px;overflow:auto;background:color-mix(in srgb,var(--ui-stroke-secondary) 38%,transparent);}',
       '.ov-md .ov-code-copy{position:absolute;top:5px;right:5px;}',
-      '.ov-md code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;tab-size:4;}',
-      '.ov-md :not(pre)>code{background:color-mix(in srgb,var(--ui-stroke-secondary) 45%,transparent);border-radius:4px;padding:1px 4px;}',
+      '.ov-md code{font-family:var(--dt-font-mono,var(--theme-font-mono,ui-monospace,monospace));tab-size:4;}',
+      '.ov-md :not(pre)>code{background:color-mix(in srgb,var(--ui-stroke-secondary) 45%,transparent);border-radius:var(--radius-sm,4px);padding:1px 4px;}',
       '.ov-mermaid{width:100%;margin:1.3em 0;padding:10px 0;overflow:auto;border-top:1px solid var(--ui-stroke-secondary);border-bottom:1px solid var(--ui-stroke-secondary);}',
       '.ov-mermaid svg{display:block;width:100%;min-width:340px;max-height:560px;}',
       '.ov-mermaid-node{fill:color-mix(in srgb,var(--ui-stroke-secondary) 36%,transparent);stroke:var(--ui-stroke-secondary);stroke-width:1.5;}',
@@ -3782,19 +3896,19 @@ function styles() {
       '.ov-mermaid-edge,.ov-mermaid-lifeline{fill:none;stroke:var(--ui-text-secondary);stroke-width:1.5;}',
       '.ov-mermaid-edge-dashed,.ov-mermaid-lifeline{stroke-dasharray:5 4;}',
       '.ov-mermaid-arrowhead{fill:var(--ui-text-secondary);}',
-      '.ov-mermaid-label{fill:var(--foreground);font:12px system-ui,sans-serif;}',
-      '.ov-mermaid-edge-label{fill:var(--ui-text-secondary);font:11px system-ui,sans-serif;}',
-      '.ov-mermaid-fallback::before{content:"Mermaid";display:block;margin-bottom:6px;color:var(--ui-text-tertiary);font:10px system-ui,sans-serif;text-transform:uppercase;}',
+      '.ov-mermaid-label{fill:var(--foreground);font:12px var(--dt-font-sans,var(--theme-font-sans,system-ui,sans-serif));}',
+      '.ov-mermaid-edge-label{fill:var(--ui-text-secondary);font:11px var(--dt-font-sans,var(--theme-font-sans,system-ui,sans-serif));}',
+      '.ov-mermaid-fallback::before{content:"Mermaid";display:block;margin-bottom:6px;color:var(--ui-text-tertiary);font:10px var(--dt-font-sans,var(--theme-font-sans,system-ui,sans-serif));text-transform:uppercase;}',
       '.ov-md table{border-collapse:collapse;width:100%;margin:1em 0;}',
       '.ov-md th,.ov-md td{border:1px solid var(--ui-stroke-secondary);padding:5px 7px;text-align:left;}',
       '.ov-md th{font-weight:600;}',
       '.ov-md .ov-table-center{text-align:center;}',
       '.ov-md .ov-table-right{text-align:right;}',
       '.ov-md hr{height:0;border:0;border-top:1px solid var(--ui-stroke-secondary);margin:2em 0;}',
-      '.ov-md img{display:block;max-width:100%;max-height:360px;object-fit:contain;height:auto;margin:1.2em auto;border:1px solid var(--ui-stroke-secondary);border-radius:6px;cursor:zoom-in;}',
+      '.ov-md img{display:block;max-width:100%;max-height:360px;object-fit:contain;height:auto;margin:1.2em auto;border:1px solid var(--ui-stroke-secondary);border-radius:var(--radius-lg,6px);cursor:zoom-in;}',
       '.ov-md img[data-local-path]{min-height:32px;}',
-      '.ov-image-detail{width:92vw;height:90vh;max-width:none;max-height:none;padding:0;border:1px solid var(--ui-stroke-secondary);border-radius:8px;background:var(--ui-bg-elevated);color:var(--ui-text-primary);}',
-      '.ov-image-detail::backdrop{background:rgba(0,0,0,.65);}.ov-image-detail-toolbar{display:flex;align-items:center;gap:12px;padding:12px;border-bottom:1px solid var(--ui-stroke-secondary);}.ov-image-detail-toolbar span{flex:1;}.ov-image-detail-toolbar button{font:inherit;color:inherit;background:var(--ui-bg-sidebar);border:1px solid var(--ui-stroke-secondary);border-radius:5px;padding:5px 10px;cursor:pointer;}',
+      '.ov-image-detail{width:92vw;height:90vh;max-width:none;max-height:none;padding:0;border:1px solid var(--ui-stroke-secondary);border-radius:var(--radius-xl,8px);background:var(--ui-bg-elevated);color:var(--ui-text-primary);}',
+      '.ov-image-detail::backdrop{background:rgba(0,0,0,.65);}.ov-image-detail-toolbar{display:flex;align-items:center;gap:12px;padding:12px;border-bottom:1px solid var(--ui-stroke-secondary);}.ov-image-detail-toolbar span{flex:1;}.ov-image-detail-toolbar button{font:inherit;color:inherit;background:var(--ui-bg-sidebar);border:1px solid var(--ui-stroke-secondary);border-radius:var(--radius-md,5px);padding:5px 10px;cursor:pointer;}',
       '.ov-image-detail-viewport{height:calc(100% - 58px);overflow:auto;display:flex;align-items:center;justify-content:center;}.ov-image-detail-viewport img{max-width:100%;max-height:100%;object-fit:contain;}.ov-image-actual{display:block;}.ov-image-actual img{max-width:none;max-height:none;}',
       '.ov-browser{height:100%;min-height:0;display:flex;flex-direction:column;color:var(--foreground);}',
       '.ov-browser-toolbar{height:38px;min-height:38px;display:flex;align-items:center;gap:3px;padding:3px 7px;box-sizing:border-box;border-bottom:1px solid var(--ui-stroke-secondary);}',
@@ -3803,50 +3917,55 @@ function styles() {
       '.ov-browser-frame{width:100%;height:100%;display:flex;flex:1;}',
       '.ov-browser-error{display:flex;align-items:center;justify-content:center;gap:10px;padding:10px;border-bottom:1px solid var(--ui-stroke-secondary);color:var(--ui-text-secondary);}',
       '.ov-picker{position:absolute;inset:0;display:flex;align-items:flex-start;justify-content:center;padding-top:12%;z-index:20;background:color-mix(in srgb,var(--ui-bg-chrome) 58%,transparent);}',
-      '.ov-picker-panel{width:min(560px,calc(100% - 36px));border:1px solid var(--ui-stroke-secondary);color:var(--foreground);background:var(--ui-bg-elevated);padding:10px;border-radius:8px;}',
+      '.ov-picker-panel{width:min(560px,calc(100% - 36px));border:1px solid var(--ui-stroke-secondary);color:var(--foreground);background:var(--ui-bg-elevated);padding:10px;border-radius:var(--radius-xl,8px);}',
       '.ov-picker-list{max-height:360px;overflow:auto;margin-top:8px;}',
-      '.ov-picker-row{width:100%;display:block;border:1px solid transparent;background:transparent;color:var(--foreground);border-radius:6px;text-align:left;padding:6px 8px;font:inherit;cursor:pointer;}',
+      '.ov-picker-row{width:100%;display:block;border:1px solid transparent;background:transparent;color:var(--foreground);border-radius:var(--radius-lg,6px);text-align:left;padding:6px 8px;font:inherit;cursor:pointer;}',
       '.ov-side-primary{flex:1;min-height:120px;display:flex;overflow:hidden;}',
       '.ov-side-graph-section{height:320px;min-height:230px;display:flex;flex-direction:column;border-top:1px solid var(--ui-stroke-secondary);}',
       '.ov-side-graph-head{min-height:38px;box-sizing:border-box;display:flex;align-items:center;gap:6px;padding:4px 6px 4px 10px;}',
       '.ov-side-graph-title{flex:1;min-width:0;color:var(--ui-text-tertiary);font-size:10px;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}',
       '.ov-graph-options{display:flex;align-items:center;gap:5px;flex-shrink:0;}',
-      '.ov-graph-tags{display:flex;align-items:center;gap:3px;color:var(--ui-text-tertiary);font:10px system-ui,sans-serif;cursor:pointer;white-space:nowrap;}',
+      '.ov-graph-tags{display:flex;align-items:center;gap:3px;color:var(--ui-text-tertiary);font:10px var(--dt-font-sans,var(--theme-font-sans,system-ui,sans-serif));cursor:pointer;white-space:nowrap;}',
       '.ov-graph-tags input{width:12px;height:12px;margin:0;accent-color:var(--ui-accent);}',
-      '.ov-graph-scope{height:25px;display:flex;border:1px solid var(--ui-stroke-secondary);border-radius:5px;overflow:hidden;}',
-      '.ov-graph-scope-button{border:0;border-right:1px solid var(--ui-stroke-secondary);padding:0 5px;background:transparent;color:var(--ui-text-tertiary);font:10px system-ui,sans-serif;cursor:pointer;}',
+      '.ov-graph-scope{height:25px;display:flex;border:1px solid var(--ui-stroke-secondary);border-radius:var(--radius-md,5px);overflow:hidden;}',
+      '.ov-graph-scope-button{border:0;border-right:1px solid var(--ui-stroke-secondary);padding:0 5px;background:transparent;color:var(--ui-text-tertiary);font:10px var(--dt-font-sans,var(--theme-font-sans,system-ui,sans-serif));cursor:pointer;}',
       '.ov-graph-scope-button:last-child{border-right:0;}',
       '.ov-graph-scope-button:hover,.ov-graph-scope-active{color:var(--ui-accent);box-shadow:inset 0 -2px var(--ui-accent);}',
       '.ov-graph{width:100%;flex:1;min-height:0;position:relative;}',
       '.ov-graph canvas{width:100%;height:100%;display:block;color:var(--foreground);}',
       '.ov-graph-empty{height:100%;display:flex;align-items:center;justify-content:center;color:var(--ui-text-tertiary);}',
       '.ov-graph-controls{position:absolute;top:3px;right:5px;z-index:1;display:flex;gap:1px;}',
-      '.ov-graph-dialog{position:fixed;inset:0;margin:auto;transform:none;width:min(1200px,92vw);height:85vh;max-width:92vw;max-height:90vh;padding:0;border:1px solid var(--ui-stroke-secondary);color:var(--foreground);background:var(--ui-bg-elevated);box-sizing:border-box;}',
+      '.ov-graph-dialog{position:fixed;inset:0;margin:auto;transform:none;width:min(1200px,92vw);height:85vh;max-width:92vw;max-height:90vh;padding:0;border:1px solid var(--ui-stroke-secondary);border-radius:var(--radius-xl,10px);color:var(--foreground);background:var(--ui-widget-surface-background,var(--ui-bg-elevated));box-shadow:var(--shadow-md,none);box-sizing:border-box;}',
       '.ov-graph-dialog-body{display:flex;flex-direction:column;width:100%;height:100%;min-height:0;}',
       '.ov-graph-dialog-title{flex:1;min-width:0;margin:0;font-size:14px;font-weight:600;}',
       '.ov-graph-context{padding:8px 12px;border-bottom:1px solid var(--ui-stroke-secondary);font-size:12px;overflow-wrap:anywhere;color:var(--ui-text-secondary);}',
       '.ov-graph-dialog .ov-side-graph-head{flex-wrap:wrap;gap:8px;padding:8px 12px;flex-shrink:0;}',
       '.ov-version{margin-left:auto;color:var(--ui-text-tertiary);white-space:nowrap;text-transform:none;}',
       '.ov-setup{height:100%;display:flex;align-items:center;justify-content:center;padding:28px;box-sizing:border-box;}',
-      '.ov-setup-card{width:min(520px,100%);padding:24px;border:1px solid var(--ui-stroke-secondary);border-radius:10px;background:var(--ui-bg-card);}',
+      '.ov-setup-card{width:min(520px,100%);padding:24px;border:1px solid var(--ui-stroke-secondary);border-radius:var(--radius-xl,10px);background:var(--ui-bg-card);}',
       '.ov-setup-card h2{margin:0 0 8px;font-size:18px;}',
       '.ov-setup-card p{margin:0 0 16px;color:var(--ui-text-secondary);line-height:1.55;}',
       '.ov-settings-backdrop{position:absolute;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;padding:18px;background:color-mix(in srgb,var(--ui-bg-chrome) 65%,transparent);box-sizing:border-box;}',
-      '.ov-settings{width:min(580px,100%);max-height:calc(100% - 20px);overflow:auto;border:1px solid var(--ui-stroke-secondary);border-radius:10px;background:var(--ui-bg-elevated);color:var(--foreground);box-shadow:0 14px 42px color-mix(in srgb,var(--foreground) 20%,transparent);}',
+      '.ov-settings{width:min(580px,100%);max-height:calc(100% - 20px);overflow:auto;border:1px solid var(--ui-stroke-secondary);border-radius:var(--radius-xl,10px);background:var(--ui-widget-surface-background,var(--ui-bg-elevated));color:var(--foreground);box-shadow:var(--shadow-md,0 14px 42px color-mix(in srgb,var(--foreground) 20%,transparent));}',
       '.ov-settings-head{display:flex;align-items:center;padding:12px 14px;border-bottom:1px solid var(--ui-stroke-secondary);}',
       '.ov-settings-head h2{flex:1;margin:0;font-size:15px;}',
       '.ov-settings-body{display:flex;flex-direction:column;gap:15px;padding:16px;}',
       '.ov-setting{display:flex;flex-direction:column;gap:6px;}',
       '.ov-setting-label{font-weight:600;}',
       '.ov-setting-help{color:var(--ui-text-tertiary);line-height:1.45;}',
+      '.ov-setting-help-block{display:block;margin-top:3px;}',
       '.ov-setting-row{display:flex;align-items:center;gap:9px;}',
       '.ov-setting-row .ov-input{flex:1;}',
       '.ov-setting-check{display:flex;align-items:flex-start;gap:9px;color:var(--ui-text-secondary);line-height:1.45;cursor:pointer;}',
       '.ov-setting-check input{margin-top:2px;accent-color:var(--ui-accent);}',
-      '.ov-setting-status{display:grid;grid-template-columns:auto 1fr;gap:5px 12px;padding:10px;border-radius:6px;background:var(--ui-bg-card);}',
+      '.ov-setting-status{display:grid;grid-template-columns:auto 1fr;gap:5px 12px;padding:10px;border-radius:var(--radius-lg,6px);background:var(--ui-bg-card);}',
       '.ov-setting-status dt{color:var(--ui-text-tertiary);}',
       '.ov-setting-status dd{margin:0;overflow-wrap:anywhere;}',
-      '@container ovvault (max-width:860px){.ov-edit-split{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) minmax(0,1fr);}.ov-live-preview{border-left:0;border-top:1px solid var(--ui-stroke-secondary);}}',
+      '@container ovcontent (max-width:860px){.ov-edit-split{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) minmax(0,1fr);}.ov-live-preview{border-left:0;border-top:1px solid var(--ui-stroke-secondary);}}',
+      '@container ovcontent (max-width:760px){.ov-toolbar{flex-wrap:wrap;height:auto;}.ov-toolbar>.ov-grow{flex-basis:24px;}.ov-formatbar{flex-wrap:wrap;height:auto;overflow-x:visible;}.ov-format-modes{margin-left:0;}.ov-note-title-inner{column-gap:8px;}.ov-conflict-columns{grid-template-columns:1fr;}.ov-side-graph-head{flex-wrap:wrap;}}',
+      '@container ovcontent (max-width:560px){.ov-toolbar{padding:6px;gap:4px;}.ov-toolbar-group{max-width:100%;flex-wrap:wrap;}.ov-formatbar{padding:4px 6px;}.ov-format-spacer{display:none;}.ov-format-modes{flex-basis:100%;justify-content:flex-end;padding-top:2px;}.ov-note-title-panel{padding:13px 10px 9px;}.ov-note-title-input{font-size:22px;}.ov-pinned-label{display:flex;margin:3px 0 0;}.ov-graph-options{flex-wrap:wrap;}}',
+      '@container ovcontent (max-width:360px){.ov-toolbar>.ov-grow{display:none;}.ov-toolbar-group{flex:1 1 100%;}.ov-toolbar-group:last-child{justify-content:flex-end;}.ov-format-modes{justify-content:flex-start;}}',
+      '@container ovvault (max-width:560px){.ov-empty-actions>.ov-button{flex:1 1 150px;}.ov-settings-body{padding:12px;}}',
     ].join('\n'),
   })
 }
@@ -3854,7 +3973,39 @@ function styles() {
 const MemoRightSidebar = typeof memo === 'function' ? memo(RightSidebar) : RightSidebar
 const MemoFileTree = typeof memo === 'function' ? memo(FileTree) : FileTree
 
-function MainPane({ tabId = DEFAULT_TAB_ID, initialPath = '' } = {}) {
+function VaultTitlebarToggle({ label, onToggle, isActive }) {
+  const [hovered, setHovered] = useState(false)
+  const [pressed, setPressed] = useState(function() { return Boolean(isActive()) })
+  useEffect(function() {
+    function update() { setPressed(Boolean(isActive())) }
+    vaultActivityListeners.add(update)
+    update()
+    return function() { vaultActivityListeners.delete(update) }
+  }, [isActive])
+  return jsx('button', {
+    type: 'button',
+    title: label,
+    'aria-label': label,
+    'aria-pressed': pressed,
+    onPointerDown: function(event) { event.stopPropagation() },
+    onMouseEnter: function() { setHovered(true) },
+    onMouseLeave: function() { setHovered(false) },
+    onFocus: function() { setHovered(true) },
+    onBlur: function() { setHovered(false) },
+    onClick: function(event) { event.stopPropagation(); return onToggle() },
+    style: {
+      WebkitAppRegion: 'no-drag', order: -1000, width: 28, height: 28, padding: 0,
+      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+      border: '1px solid ' + (pressed ? 'var(--ui-accent)' : 'transparent'), borderRadius: 'var(--radius-md,5px)',
+      color: pressed ? 'var(--ui-accent)' : 'var(--ui-text-secondary)',
+      background: hovered ? 'var(--ui-control-hover-background,var(--chrome-action-hover))' : (pressed ? 'var(--ui-control-active-background,color-mix(in srgb,var(--ui-accent) 12%,transparent))' : 'transparent'),
+      cursor: 'pointer', transition: 'background .12s ease,border-color .12s ease,color .12s ease',
+    },
+    children: jsx(Codicon, { name: 'library', size: '1rem' }),
+  })
+}
+
+function MainPane({ tabId = DEFAULT_TAB_ID, initialPath = '', preserveEmpty = false } = {}) {
   const t = useVaultI18n()
   const restoredTabSnapshot = vaultTabs.get(tabId)?.snapshot || null
   const [moveRequest, setMoveRequest] = useState(null)
@@ -3862,6 +4013,7 @@ function MainPane({ tabId = DEFAULT_TAB_ID, initialPath = '' } = {}) {
   const rootRef = useRef(null)
   const textareaRef = useRef(null)
   const visualEditorRef = useRef(null)
+  const selectedPassageRef = useRef('')
   const titleRenamePendingRef = useRef(false)
   const noteLoadRequestRef = useRef(0)
   const externalFileSignatureRef = useRef({ path: '', signature: '' })
@@ -3906,6 +4058,10 @@ function MainPane({ tabId = DEFAULT_TAB_ID, initialPath = '' } = {}) {
   const hideRightSidebar = useCallback(function() { setRightVisible(false) }, [setRightVisible])
   const [shareWithAgent, setShareWithAgent] = useState(false)
   const [restoreTabs, setRestoreTabs] = useState(true)
+  const [useSessionWorkspaces, setUseSessionWorkspaces] = useState(sessionWorkspacesEnabled)
+  const [pinned, setPinned] = useState(Boolean(vaultTabs.get(tabId)?.pinned))
+  const [selectedPassage, setSelectedPassage] = useState('')
+  const [selectionMenu, setSelectionMenu] = useState(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [rightTab, setRightTab] = useState('outline')
   const [headingTarget, setHeadingTarget] = useState(null)
@@ -3914,6 +4070,10 @@ function MainPane({ tabId = DEFAULT_TAB_ID, initialPath = '' } = {}) {
   const [treeFoldAction, setTreeFoldAction] = useState({ mode: '', tick: 0 })
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pickerInitialQuery, setPickerInitialQuery] = useState('')
+  const [emptyCreateOpen, setEmptyCreateOpen] = useState(false)
+  const [emptyCreateName, setEmptyCreateName] = useState('')
+  const [emptyCreateBusy, setEmptyCreateBusy] = useState(false)
+  const emptyCreateInputRef = useRef(null)
   const [navigation, setNavigation] = useState(function() {
     const restored = restoredTabSnapshot && restoredTabSnapshot.navigation
     if (restored && Array.isArray(restored.entries) && Number.isInteger(restored.index)) {
@@ -3959,6 +4119,89 @@ function MainPane({ tabId = DEFAULT_TAB_ID, initialPath = '' } = {}) {
   const folderCount = useMemo(function() {
     return entries.filter(function(entry) { return entry.type === 'dir' }).length
   }, [entries])
+
+  const rememberSelectedPassage = useCallback(function(value) {
+    const next = String(value || '')
+    selectedPassageRef.current = next
+    setSelectedPassage(next)
+    return next
+  }, [])
+
+  const selectionInsideNote = useCallback(function() {
+    const root = rootRef.current
+    const textarea = textareaRef.current
+    if (textarea && document.activeElement === textarea && textarea.selectionEnd > textarea.selectionStart) {
+      return rememberSelectedPassage(textarea.value.slice(textarea.selectionStart, textarea.selectionEnd))
+    }
+    if (!root || typeof window === 'undefined' || !window.getSelection) return ''
+    const selection = window.getSelection()
+    if (!selection || !selection.rangeCount || selection.isCollapsed) return ''
+    const anchor = selection.anchorNode
+    const focus = selection.focusNode
+    const noteSurface = root.querySelector('.ov-main')
+    if (!noteSurface || !anchor || !focus || !noteSurface.contains(anchor) || !noteSurface.contains(focus)) {
+      rememberSelectedPassage('')
+      return ''
+    }
+    return rememberSelectedPassage(selection.toString())
+  }, [rememberSelectedPassage])
+
+  const quoteSelectedPassage = useCallback(async function(value) {
+    const passage = value === undefined ? selectedPassageRef.current : value
+    const quote = formatSelectionQuote(passage)
+    if (!quote) {
+      notifyError(new Error(t('messageSelectPassageToQuote')), NAME)
+      return false
+    }
+    let inserted = false
+    try {
+      inserted = await insertSelectionQuote(passage)
+    } catch (error) {
+      reportPluginError('quote insertion failed', error)
+    }
+    if (!inserted) {
+      notifyError(new Error(t('messageComposerUnavailableForQuote')), NAME)
+      return false
+    }
+    rememberSelectedPassage('')
+    setSelectionMenu(null)
+    return true
+  }, [rememberSelectedPassage, t])
+
+  const togglePinnedTab = useCallback(function() {
+    const tab = vaultTabs.get(tabId)
+    if (!tab || !sessionWorkspacesEnabled) return
+    const next = !tab.pinned
+    tab.pinned = next
+    if (!next) tab.workspaceKey = activeWorkspaceKey
+    setPinned(next)
+    selectVaultTab(tabId)
+    persistVaultTabs()
+  }, [tabId])
+
+  useEffect(function() {
+    function changed(enabled) { setUseSessionWorkspaces(Boolean(enabled)) }
+    workspacePreferenceListeners.add(changed)
+    return function() { workspacePreferenceListeners.delete(changed) }
+  }, [])
+
+  useEffect(function() {
+    function capture() { selectionInsideNote() }
+    document.addEventListener('selectionchange', capture)
+    return function() { document.removeEventListener('selectionchange', capture) }
+  }, [selectionInsideNote])
+
+  useEffect(function() { rememberSelectedPassage('') }, [activePath, rawContent, editMode, sourceMode, rememberSelectedPassage])
+
+  useEffect(function() {
+    if (!selectionMenu) return undefined
+    function close(event) {
+      if (event.key === 'Escape' || event.type === 'mousedown') setSelectionMenu(null)
+    }
+    window.addEventListener('mousedown', close)
+    window.addEventListener('keydown', close)
+    return function() { window.removeEventListener('mousedown', close); window.removeEventListener('keydown', close) }
+  }, [selectionMenu])
 
   const toggleAgentContext = useCallback(function() {
     const next = !shareWithAgent
@@ -4054,7 +4297,7 @@ function MainPane({ tabId = DEFAULT_TAB_ID, initialPath = '' } = {}) {
       setEntries(scannedEntries)
       setAssets(scannedAssets)
       setContentsByPath(new Map(vaultNoteIndex))
-      const nextActive = keepActive && scanned.includes(keepActive) ? keepActive : scanned[0] || ''
+      const nextActive = resolveVaultActivePath(keepActive, scanned, Boolean(options.preserveEmpty))
       if (nextActive) {
         const snapshot = options.snapshot
         if (snapshot && normalizePath(snapshot.activePath) === nextActive) {
@@ -4162,6 +4405,12 @@ function MainPane({ tabId = DEFAULT_TAB_ID, initialPath = '' } = {}) {
     storageSet(STORAGE_RESTORE_TABS, next ? 'on' : 'off')
   }, [])
 
+  const changeSessionWorkspaces = useCallback(function(next) {
+    const enabled = Boolean(next)
+    if (typeof changeWorkspaceModeRuntime === 'function') changeWorkspaceModeRuntime(enabled)
+    else setSessionWorkspacesEnabled(enabled)
+  }, [])
+
   const resetLayout = useCallback(function() {
     setLeftWidth(220)
     setRightWidth(320)
@@ -4175,32 +4424,60 @@ function MainPane({ tabId = DEFAULT_TAB_ID, initialPath = '' } = {}) {
     if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(LAYOUT_RESET_EVENT))
   }, [setLeftVisible, setRightVisible])
 
-  const createNoteInDirectory = useCallback(async function(directoryPath) {
-    if (typeof window === 'undefined') return
-    const root = normalizePath(vaultPath).replace(/\/+$/, '')
-    const targetDir = normalizePath(directoryPath || root).replace(/\/+$/, '')
-    const currentDir = targetDir === root ? '' : relativeToRoot(vaultPath, targetDir)
-    const initial = currentDir ? currentDir + '/' : ''
-    const requested = window.prompt(t('messageNameOrRelativePathForTheNewNote'), initial)
-    if (requested == null) return
+  const createNoteFromRequestedPath = useCallback(async function(requested) {
     const path = resolveVaultChildPath(vaultPath, requested, '.md')
     if (!path) {
       notifyError(new Error(t('messageThePathMustStayInsideTheVault')), t('messageInvalidNoteName'))
-      return
+      return false
     }
     const ok = await createNoteFile(path)
-    if (!ok) return
+    if (!ok) return false
     setTreeQuery('')
     setTreeRevealPath(dirname(path))
     await refreshVault(vaultPath, path)
     setEditMode(true)
     setSourceMode(false)
+    return true
   }, [vaultPath, refreshVault])
+
+  const createNoteInDirectory = useCallback(async function(directoryPath) {
+    if (typeof window === 'undefined') return false
+    const root = normalizePath(vaultPath).replace(/\/+$/, '')
+    const targetDir = normalizePath(directoryPath || root).replace(/\/+$/, '')
+    const currentDir = targetDir === root ? '' : relativeToRoot(vaultPath, targetDir)
+    const initial = currentDir ? currentDir + '/' : ''
+    const requested = window.prompt(t('messageNameOrRelativePathForTheNewNote'), initial)
+    if (requested == null) return false
+    return createNoteFromRequestedPath(requested)
+  }, [vaultPath, createNoteFromRequestedPath])
 
   const createNote = useCallback(function() {
     const root = normalizePath(vaultPath).replace(/\/+$/, '')
     return createNoteInDirectory(activePath ? dirname(activePath) : root)
   }, [vaultPath, activePath, createNoteInDirectory])
+
+  const openEmptyCreate = useCallback(function() {
+    setEmptyCreateName('')
+    setEmptyCreateOpen(true)
+    requestAnimationFrame(function() {
+      if (emptyCreateInputRef.current) emptyCreateInputRef.current.focus()
+    })
+  }, [])
+
+  const submitEmptyCreate = useCallback(async function(event) {
+    if (event && typeof event.preventDefault === 'function') event.preventDefault()
+    if (emptyCreateBusy || !emptyCreateName.trim()) return
+    setEmptyCreateBusy(true)
+    try {
+      const created = await createNoteFromRequestedPath(emptyCreateName)
+      if (created) {
+        setEmptyCreateOpen(false)
+        setEmptyCreateName('')
+      }
+    } finally {
+      setEmptyCreateBusy(false)
+    }
+  }, [emptyCreateBusy, emptyCreateName, createNoteFromRequestedPath])
 
   const createFolderInDirectory = useCallback(async function(directoryPath) {
     if (typeof window === 'undefined') return
@@ -4550,6 +4827,7 @@ function MainPane({ tabId = DEFAULT_TAB_ID, initialPath = '' } = {}) {
           Promise.resolve(storageGet(STORAGE_AGENT_CONTEXT, 'off')),
           Promise.resolve(storageGet(STORAGE_RESTORE_TABS, 'on')),
           Promise.resolve(storageGet(STORAGE_VAULT_SOURCE, '')),
+          Promise.resolve(storageGet(STORAGE_SESSION_WORKSPACES_ENABLED, 'off')),
         ])
         if (cancelled) return
         let path = normalizePath(stored[0] || '')
@@ -4571,6 +4849,7 @@ function MainPane({ tabId = DEFAULT_TAB_ID, initialPath = '' } = {}) {
         setRightWidth(clampStoredWidth(stored[3], 320, 240, 520))
         setShareWithAgent(stored[4] === 'on')
         setRestoreTabs(stored[5] !== 'off')
+        setUseSessionWorkspaces(stored[7] === 'on')
 
         if (!path) {
           setLoading(false)
@@ -4582,7 +4861,10 @@ function MainPane({ tabId = DEFAULT_TAB_ID, initialPath = '' } = {}) {
         for (let attempt = 0; attempt < retryDelays.length; attempt += 1) {
           if (retryDelays[attempt]) await new Promise(function(resolve) { setTimeout(resolve, retryDelays[attempt]) })
           if (cancelled) return
-          const scannedEntries = await refreshVault(path, rememberedNote, restoredTabSnapshot ? { snapshot: restoredTabSnapshot } : {})
+          const scannedEntries = await refreshVault(path, rememberedNote, {
+            snapshot: restoredTabSnapshot,
+            preserveEmpty: preserveEmpty && !rememberedNote,
+          })
           if (cancelled || scannedEntries.length) break
         }
       } catch (error) {
@@ -4989,6 +5271,16 @@ function MainPane({ tabId = DEFAULT_TAB_ID, initialPath = '' } = {}) {
           jsxs('div', {
             className: 'ov-toolbar',
             children: [
+              jsxs('div', { className: 'ov-toolbar-group', children: [useSessionWorkspaces ? jsx('button', {
+                className: 'ov-button ov-icon-button ov-pin-button' + (pinned ? ' ov-toolbar-active' : ''),
+                type: 'button',
+                disabled: !activePath,
+                onClick: togglePinnedTab,
+                title: pinned ? t('unpinNote') : t('pinNote'),
+                'aria-label': pinned ? t('unpinNote') : t('pinNote'),
+                'aria-pressed': pinned,
+                children: jsx(Codicon, { name: 'pinned', size: '0.9rem' }),
+              }) : null,
               jsx('button', {
                 className: 'ov-button ov-icon-button',
                 type: 'button',
@@ -5015,12 +5307,12 @@ function MainPane({ tabId = DEFAULT_TAB_ID, initialPath = '' } = {}) {
                 title: t('forward'),
                 'aria-label': t('forward'),
                 children: jsx(Codicon, { name: 'arrow-right', size: '0.9rem' }),
-              }),
+              })] }),
               jsx('span', {
                 className: 'ov-grow',
                 children: loading || externalUpdates > 0 ? jsx(LoadingIndicator, { label: t('refreshing') }) : null,
               }),
-              jsx(ViewModeToggle, {
+              jsxs('div', { className: 'ov-toolbar-group', children: [jsx(ViewModeToggle, {
                 mode: viewMode,
                 disabled: !activePath,
                 onMode: changeViewMode,
@@ -5042,10 +5334,9 @@ function MainPane({ tabId = DEFAULT_TAB_ID, initialPath = '' } = {}) {
                 title: editMode ? (dirty ? t('saveAndRead') : t('read')) : t('edit'),
                 'aria-label': editMode ? (dirty ? t('saveAndRead') : t('read')) : t('edit'),
                 'aria-pressed': editMode,
-                children: jsx(Codicon, { name: editMode ? 'book' : 'edit', size: '0.9rem' }),
-              }),
-              jsx('span', { className: 'ov-format-separator' }),
-              jsx('button', {
+                children: jsx(Codicon, { name: 'edit', size: '0.9rem' }),
+              })] }),
+              jsxs('div', { className: 'ov-toolbar-group', children: [jsx('button', {
                 className: 'ov-button ov-icon-button' + (shareWithAgent ? ' ov-toolbar-active' : ''),
                 type: 'button',
                 disabled: !activePath,
@@ -5056,6 +5347,25 @@ function MainPane({ tabId = DEFAULT_TAB_ID, initialPath = '' } = {}) {
                 children: jsx(Codicon, { name: 'comment-discussion', size: '0.9rem' }),
               }),
               jsx('button', {
+                className: 'ov-button ov-icon-button ov-workspace-button' + (useSessionWorkspaces ? ' ov-toolbar-active' : ''),
+                type: 'button',
+                onClick: function() { setSettingsOpen(true) },
+                title: useSessionWorkspaces ? t('sessionWorkspaceActive') : t('sessionWorkspaceInactive'),
+                'aria-label': useSessionWorkspaces ? t('sessionWorkspaceActive') : t('sessionWorkspaceInactive'),
+                'aria-pressed': useSessionWorkspaces,
+                children: jsx(Codicon, { name: 'window', size: '0.9rem' }),
+              }),
+              jsx('button', {
+                className: 'ov-button ov-icon-button',
+                type: 'button',
+                disabled: !activePath || !selectedPassage.trim(),
+                onMouseDown: function(event) { event.preventDefault(); selectionInsideNote() },
+                onClick: function() { quoteSelectedPassage() },
+                title: t('quoteSelection'),
+                'aria-label': t('quoteSelection'),
+                children: jsx(Codicon, { name: 'quote', size: '0.9rem' }),
+              })] }),
+              jsxs('div', { className: 'ov-toolbar-group', children: [jsx('button', {
                 className: 'ov-button ov-icon-button',
                 type: 'button',
                 disabled: !activePath,
@@ -5096,9 +5406,8 @@ function MainPane({ tabId = DEFAULT_TAB_ID, initialPath = '' } = {}) {
                 title: t('moveNote'), 'aria-label': t('moveNote'),
                 onClick: function() { moveNote(activePath) },
                 children: jsx(Codicon, { name: 'move', size: '0.9rem' }),
-              }),
-              jsx('span', { className: 'ov-format-separator' }),
-              jsx('button', {
+              })] }),
+              jsxs('div', { className: 'ov-toolbar-group', children: [jsx('button', {
                 className: 'ov-button ov-icon-button',
                 type: 'button',
                 onClick: function() { setPickerOpen(true) },
@@ -5114,7 +5423,7 @@ function MainPane({ tabId = DEFAULT_TAB_ID, initialPath = '' } = {}) {
                 title: rightVisible ? t('hideContext') : t('showContext'),
                 'aria-label': rightVisible ? t('hideContext') : t('showContext'),
                 children: jsx(Codicon, { name: 'layout-sidebar-right', size: '0.9rem' }),
-              }),
+              })] }),
             ],
           }),
           editMode ? jsx(FormattingToolbar, {
@@ -5153,6 +5462,7 @@ function MainPane({ tabId = DEFAULT_TAB_ID, initialPath = '' } = {}) {
           ] }) : null,
           activePath ? jsx('div', {
             className: 'ov-note-title-panel',
+            'data-pinned': pinned ? 'true' : 'false',
             children: jsxs('div', {
               className: 'ov-note-title-inner',
               children: [
@@ -5180,9 +5490,12 @@ function MainPane({ tabId = DEFAULT_TAB_ID, initialPath = '' } = {}) {
                 }),
                 jsx('div', {
                   className: 'ov-note-folder',
-                  children: normalizePath(dirname(activePath)).replace(/\/+$/, '') === normalizePath(vaultPath).replace(/\/+$/, '')
-                    ? t('vaultRootLabel')
-                    : relativeToRoot(vaultPath, dirname(activePath)),
+                  children: jsxs('span', { children: [
+                    normalizePath(dirname(activePath)).replace(/\/+$/, '') === normalizePath(vaultPath).replace(/\/+$/, '')
+                      ? t('vaultRootLabel')
+                      : relativeToRoot(vaultPath, dirname(activePath)),
+                    pinned ? jsxs('span', { className: 'ov-pinned-label', children: [jsx(Codicon, { name: 'pinned', size: '0.75rem' }), t('pinnedNote')] }) : null,
+                  ] }),
                 }),
                 saving || saveFailed ? jsx('span', {
                   className: 'ov-note-status', role: 'status',
@@ -5205,13 +5518,51 @@ function MainPane({ tabId = DEFAULT_TAB_ID, initialPath = '' } = {}) {
                 className: 'ov-body',
                 children: jsx('main', {
                   className: 'ov-main' + (editMode ? ' ov-main-edit' : ''),
+                  onContextMenuCapture: function(event) {
+                    const passage = selectionInsideNote()
+                    if (!passage.trim()) return
+                    event.preventDefault()
+                    event.stopPropagation()
+                    setSelectionMenu({
+                      text: passage,
+                      left: Math.max(8, Math.min(event.clientX, window.innerWidth - 226)),
+                      top: Math.max(8, Math.min(event.clientY, window.innerHeight - 82)),
+                    })
+                  },
                   children: !vaultPath ? jsx('div', {
                     className: 'ov-setup',
                     children: jsxs('div', { className: 'ov-setup-card', children: [
                       jsx('h2', { children: t('configure') }),
                       jsx('p', { children: t('configureHelp') }),
                     ] }),
-                  }) : !activePath ? jsx('div', { className: 'ov-panel-view ov-muted', children: t('noNote') })
+                  }) : !activePath ? jsx('div', { className: 'ov-empty-state', children: jsxs('div', { className: 'ov-empty-card', children: [
+                    jsx('span', { className: 'ov-empty-icon', 'aria-hidden': true, children: jsx(Codicon, { name: 'note', size: '1.4rem' }) }),
+                    jsx('h2', { children: t('noNote') }),
+                    jsx('p', { children: t('noNoteHelp') }),
+                    jsxs('div', { className: 'ov-empty-actions', children: [
+                      jsxs('button', { type: 'button', className: 'ov-button ov-primary-button', onClick: openEmptyCreate, 'aria-expanded': emptyCreateOpen, children: [
+                        jsx(Codicon, { name: 'new-file', size: '0.95rem', 'aria-hidden': true }),
+                        jsx('span', { children: t('createNote') }),
+                      ] }),
+                      jsx('button', { type: 'button', className: 'ov-button', onClick: function() { setPickerInitialQuery(''); setPickerOpen(true) }, children: t('openNoteAction') }),
+                    ] }),
+                    emptyCreateOpen ? jsxs('form', { className: 'ov-empty-create-form', onSubmit: submitEmptyCreate, children: [
+                      jsx('input', {
+                        ref: emptyCreateInputRef,
+                        className: 'ov-input',
+                        value: emptyCreateName,
+                        disabled: emptyCreateBusy,
+                        placeholder: t('messageNameOrRelativePathForTheNewNote'),
+                        'aria-label': t('messageNameOrRelativePathForTheNewNote'),
+                        onChange: function(event) { setEmptyCreateName(event.target.value) },
+                      }),
+                      jsxs('button', { type: 'submit', className: 'ov-button ov-primary-button', disabled: emptyCreateBusy || !emptyCreateName.trim(), children: [
+                        jsx(Codicon, { name: 'check', size: '0.95rem', 'aria-hidden': true }),
+                        jsx('span', { children: t('createNote') }),
+                      ] }),
+                      jsx('button', { type: 'button', className: 'ov-button', disabled: emptyCreateBusy, onClick: function() { setEmptyCreateOpen(false); setEmptyCreateName('') }, children: t('cancel') }),
+                    ] }) : null,
+                  ] }) })
                     : sourceMode
                     ? editMode ? jsxs('div', {
                         className: 'ov-edit-split' + (showLivePreview ? '' : ' ov-edit-solo'),
@@ -5223,6 +5574,10 @@ function MainPane({ tabId = DEFAULT_TAB_ID, initialPath = '' } = {}) {
                               className: 'ov-textarea',
                               value: rawContent,
                               onChange: function(event) { setRawContent(event.target.value) },
+                              onSelect: function(event) {
+                                const input = event.currentTarget
+                                rememberSelectedPassage(input.selectionEnd > input.selectionStart ? input.value.slice(input.selectionStart, input.selectionEnd) : '')
+                              },
                               onKeyDown: function(event) {
                                 if (event.key === 'Tab' && !event.ctrlKey && !event.metaKey && !event.altKey && !event.isComposing) {
                                   event.preventDefault()
@@ -5330,6 +5685,17 @@ function MainPane({ tabId = DEFAULT_TAB_ID, initialPath = '' } = {}) {
         },
         onClose: function() { setPickerOpen(false) },
       }) : null,
+      selectionMenu ? jsx('div', {
+        className: 'ov-context-menu ov-selection-menu',
+        role: 'menu',
+        style: { left: selectionMenu.left, top: selectionMenu.top },
+        onMouseDown: function(event) { event.stopPropagation() },
+        onContextMenu: function(event) { event.preventDefault(); event.stopPropagation() },
+        children: [
+          jsx('button', { type: 'button', role: 'menuitem', className: 'ov-context-item', onClick: function() { writePluginClipboard(selectionMenu.text); setSelectionMenu(null) }, children: [jsx('span', { className: 'ov-context-icon', children: jsx(Codicon, { name: 'copy', size: '0.85rem' }) }), t('copySelection')] }, 'copy'),
+          jsx('button', { type: 'button', role: 'menuitem', className: 'ov-context-item', onClick: async function() { if (await quoteSelectedPassage(selectionMenu.text)) setSelectionMenu(null) }, children: [jsx('span', { className: 'ov-context-icon', children: jsx(Codicon, { name: 'quote', size: '0.85rem' }) }), t('quoteSelection')] }, 'quote'),
+        ],
+      }) : null,
       moveRequest ? jsx(MoveEntryDialog, {
         request: moveRequest, entries: entries, vaultPath: vaultPath,
         onClose: function() { setMoveRequest(null) },
@@ -5349,6 +5715,8 @@ function MainPane({ tabId = DEFAULT_TAB_ID, initialPath = '' } = {}) {
         onShareWithAgent: toggleAgentContext,
         restoreTabs: restoreTabs,
         onRestoreTabs: changeRestoreTabs,
+        sessionWorkspaces: useSessionWorkspaces,
+        onSessionWorkspaces: changeSessionWorkspaces,
         onResetLayout: resetLayout,
         ready: Boolean(vaultPath && vaultReady && !vaultInitializing),
         onClose: function() { setSettingsOpen(false) },
@@ -5357,7 +5725,7 @@ function MainPane({ tabId = DEFAULT_TAB_ID, initialPath = '' } = {}) {
   })
 }
 
-function SettingsDialog({ vaultPath, draftVaultPath, onDraftVaultPath, onApplyVaultPath, vaultSource, shareWithAgent, onShareWithAgent, restoreTabs, onRestoreTabs, onResetLayout, ready, onClose }) {
+function SettingsDialog({ vaultPath, draftVaultPath, onDraftVaultPath, onApplyVaultPath, vaultSource, shareWithAgent, onShareWithAgent, restoreTabs, onRestoreTabs, sessionWorkspaces, onSessionWorkspaces, onResetLayout, ready, onClose }) {
   const t = useVaultI18n()
   const [privacy, setPrivacy] = useState({ guidance: agentGuidanceEnabled, images: remoteImagesEnabled })
   useEffect(function() {
@@ -5449,6 +5817,10 @@ function SettingsDialog({ vaultPath, draftVaultPath, onDraftVaultPath, onApplyVa
           jsx('label', { className: 'ov-setting-check', children: [
             jsx('input', { type: 'checkbox', checked: restoreTabs, onChange: function(event) { onRestoreTabs(event.target.checked) } }),
             jsx('span', { children: t('restoreTabs') }),
+          ] }),
+          jsxs('label', { className: 'ov-setting-check', children: [
+            jsx('input', { type: 'checkbox', checked: sessionWorkspaces, onChange: function(event) { onSessionWorkspaces(event.target.checked) } }),
+            jsxs('span', { children: [t('sessionWorkspaces'), jsx('span', { className: 'ov-setting-help ov-setting-help-block', children: t('sessionWorkspacesHelp') })] }),
           ] }),
           jsxs('div', { className: 'ov-setting', children: [
             jsx('span', { className: 'ov-setting-label', children: t('layout') }),
@@ -7166,14 +7538,21 @@ function PaletteCommand({ files, vaultPath, initialQuery, contentsByPath = vault
 }
 
 function listenVaultConversationChanges(state, onChange) {
-  const store = state && (state.focusedStoredSessionId || state.selectedStoredSessionId || state.activeSessionId)
-  if (!store || typeof store.listen !== 'function' || typeof store.get !== 'function') return function() {}
-  let previous = store.get()
-  return store.listen(function(value) {
-    if (value === previous) return
-    previous = value
-    onChange(value)
+  if (!state) return function() {}
+  const stores = [state.focusedStoredSessionId || state.selectedStoredSessionId || state.activeSessionId, state.focusedSessionId, state.focusedSessionProfile || state.profile].filter(function(store, index, all) {
+    return store && typeof store.listen === 'function' && typeof store.get === 'function' && all.indexOf(store) === index
   })
+  if (!stores.length) return function() {}
+  let previous = focusedWorkspaceIdentity(state)
+  const stops = stores.map(function(store) {
+    return store.listen(function() {
+      const value = focusedWorkspaceIdentity(state)
+      if (value === previous) return
+      previous = value
+      onChange(value)
+    })
+  })
+  return function() { stops.forEach(function(stop) { if (typeof stop === 'function') stop() }) }
 }
 
 export default {
@@ -7212,6 +7591,11 @@ export default {
     }).catch(function(error) { reportPluginError('language preference unavailable', error) })
     vaultTabs.clear()
     activeVaultTabId = DEFAULT_TAB_ID
+    activeWorkspaceKey = focusedWorkspaceIdentity(host && host.state)
+    workspaceOpenState.clear()
+    workspaceOpenState.set('global', true)
+    workspaceActiveTab.clear()
+    workspaceStorageReady = false
     let initialOpenTimer = null
     let agentBridgeTimer = null
     let agentBridgeInitialTimer = null
@@ -7233,6 +7617,26 @@ export default {
       }
       return false
     }
+    function revealRegisteredVaultWorkspace() {
+      const registered = Array.from(vaultTabs.values()).filter(function(tab) {
+        return tabIsVisibleInWorkspace(tab) && !tab.suspended && typeof tab.close === 'function'
+      })
+      if (!registered.length) return false
+      const active = registered.find(function(tab) { return tab.tabId === activeVaultTabId }) || registered[registered.length - 1]
+      workspaceHidden = false
+      if (typeof host.revealPane === 'function') {
+        host.revealPane('plugin-workspace:' + active.tabId)
+        selectVaultTab(active.tabId)
+        storageSet(STORAGE_WORKSPACE_OPEN, 'open')
+        return true
+      }
+      return showVaultWorkspace({ tabId: active.tabId, path: active.path || '', workspaceKey: active.workspaceKey, pinned: active.pinned, snapshot: active.snapshot })
+    }
+    function hasRegisteredVaultWorkspace() {
+      return Array.from(vaultTabs.values()).some(function(tab) {
+        return tabIsVisibleInWorkspace(tab) && !tab.suspended && typeof tab.close === 'function'
+      })
+    }
     function showVaultWorkspace(options = {}) {
       if (disposed || !host || typeof host.openWorkspace !== 'function') return false
       workspaceTouched = true
@@ -7240,13 +7644,27 @@ export default {
       if (initialOpenTimer != null) clearTimeout(initialOpenTimer)
       initialOpenTimer = null
       const previousTabId = activeVaultTabId
-      const tabId = options.newTab ? ID + ':tab:' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8) : (options.tabId || activeVaultTabId)
+      const activeCandidate = vaultTabs.get(activeVaultTabId)
+      const needsFreshTab = options.newTab || (!options.tabId && sessionWorkspacesEnabled && (!activeCandidate || !tabIsVisibleInWorkspace(activeCandidate) || activeCandidate.pinned))
+      const tabId = needsFreshTab ? ID + ':tab:' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8) : (options.tabId || activeVaultTabId)
       const existing = vaultTabs.get(tabId)
-      const tab = existing || { tabId: tabId, path: options.path || '' }
+      if (existing && !existing.suspended && typeof existing.close === 'function' && typeof host.revealPane === 'function') {
+        workspaceHidden = false
+        host.revealPane('plugin-workspace:' + tabId)
+        selectVaultTab(tabId)
+        storageSet(STORAGE_WORKSPACE_OPEN, 'open')
+        return tabId
+      }
+      const tab = existing || { tabId: tabId, path: options.path || '', workspaceKey: options.workspaceKey || (sessionWorkspacesEnabled ? activeWorkspaceKey : 'global'), pinned: Boolean(options.pinned), snapshot: options.snapshot || null }
+      if (!tab.workspaceKey) tab.workspaceKey = options.workspaceKey || (sessionWorkspacesEnabled ? activeWorkspaceKey : 'global')
+      if (options.pinned !== undefined) tab.pinned = Boolean(options.pinned)
+      if (options.snapshot && !tab.snapshot) tab.snapshot = options.snapshot
       tab.suspended = false
       tab.title = tab.path ? basename(tab.path).replace(/\.md$/i, '') : 'Vault View'
-      const previewAnchor = vaultTabs.has(previousTabId) && previousTabId !== tabId ? 'plugin-workspace:' + previousTabId : ''
+      const previousTab = vaultTabs.get(previousTabId)
+      const previewAnchor = previousTab && tabIsVisibleInWorkspace(previousTab) && previousTabId !== tabId ? 'plugin-workspace:' + previousTabId : ''
       vaultTabs.set(tabId, tab)
+      if (!tab.pinned) workspaceOpenState.set(tab.workspaceKey, true)
       const workspaceOptions = {
         dock: previewAnchor
           ? { before: previewAnchor, pane: previewAnchor, pos: 'center' }
@@ -7268,14 +7686,23 @@ export default {
             }).catch(function(error) { reportPluginError('cancelled command result failed', error) })
           })
           if (activeVaultTabId === tabId) {
-            activeVaultTabId = Array.from(vaultTabs.keys()).pop() || DEFAULT_TAB_ID
+            const fallback = Array.from(vaultTabs.values()).filter(function(candidate) { return tabIsVisibleInWorkspace(candidate) }).pop()
+            activeVaultTabId = fallback ? fallback.tabId : DEFAULT_TAB_ID
             vaultSessionContext = vaultTabs.get(activeVaultTabId)?.context || { activePath: '', shareWithAgent: false }
           }
+          if (!tab.pinned && !Array.from(vaultTabs.values()).some(function(candidate) { return !candidate.pinned && candidate.workspaceKey === tab.workspaceKey })) workspaceOpenState.set(tab.workspaceKey, false)
           storageSet(STORAGE_WORKSPACE_OPEN, vaultTabs.size ? 'open' : 'closed')
           persistVaultTabs()
           if (tab.context && tab.context.vaultPath) writeVaultAgentState(tab.context.vaultPath, '', false)
         },
-        render: existing ? existing.render : (tab.render = function() { return jsx(MainPane, { tabId: tabId, initialPath: tab.path || options.path || '' }, tabId) }),
+        render: tab.render || (tab.render = function() {
+          const initialPath = tab.path || options.path || ''
+          return jsx(MainPane, {
+            tabId: tabId,
+            initialPath: initialPath,
+            preserveEmpty: sessionWorkspacesEnabled && !normalizePath(initialPath),
+          }, tabId)
+        }),
       }
       try {
         tab.close = host.openWorkspace(tabId, workspaceOptions)
@@ -7299,10 +7726,8 @@ export default {
         const title = tab.path ? basename(tab.path).replace(/\.md$/i, '') : 'Vault View'
         if (title === tab.title || disposed) return
         tab.title = title
-        workspaceOptions.title = title
-        tab.close = host.openWorkspace(tabId, workspaceOptions)
       }
-      selectVaultTab(tabId)
+      if (tabIsVisibleInWorkspace(tab)) selectVaultTab(tabId)
       storageSet(STORAGE_WORKSPACE_OPEN, 'open')
       return tabId
     }
@@ -7310,6 +7735,7 @@ export default {
       const tabs = Array.from(vaultTabs.values()).filter(function(tab) { return typeof tab.close === 'function' })
       if (!tabs.length) return false
       workspaceHidden = true
+      workspaceOpenState.set(sessionWorkspacesEnabled ? activeWorkspaceKey : 'global', false)
       // Retire every registered Vault View pane so another Vault tab cannot
       // become visible underneath. The tab metadata and editor snapshot stay
       // in memory and are restored when the title-bar button is pressed again.
@@ -7325,9 +7751,12 @@ export default {
       return true
     }
     function restoreVaultWorkspace() {
-      const suspended = Array.from(vaultTabs.values()).filter(function(tab) { return tab.suspended || typeof tab.close !== 'function' })
+      workspaceHidden = false
+      workspaceOpenState.set(sessionWorkspacesEnabled ? activeWorkspaceKey : 'global', true)
+      const suspended = Array.from(vaultTabs.values()).filter(function(tab) { return tabIsVisibleInWorkspace(tab) && (tab.suspended || typeof tab.close !== 'function') })
       if (!suspended.length) return showVaultWorkspace()
-      const targetTabId = activeVaultTabId
+      const activeTab = vaultTabs.get(activeVaultTabId)
+      const targetTabId = activeTab && activeTab.pinned ? activeVaultTabId : (workspaceActiveTab.get(sessionWorkspacesEnabled ? activeWorkspaceKey : 'global') || activeVaultTabId)
       suspended.sort(function(a, b) { return Number(a.tabId === targetTabId) - Number(b.tabId === targetTabId) })
       let restored = false
       suspended.forEach(function(tab) {
@@ -7337,19 +7766,92 @@ export default {
     }
     function toggleVaultWorkspace() {
       if (disposed || !host) return false
-      if (!isVaultWorkspaceVisible()) return restoreVaultWorkspace()
-      return hideVaultWorkspace()
+      try {
+        const toggled = hasRegisteredVaultWorkspace() ? hideVaultWorkspace() : restoreVaultWorkspace()
+        if (!toggled) notifyError(new Error(t('messageTabOpeningUnavailable')), NAME)
+        vaultActivityListeners.forEach(function(listener) { listener() })
+        return toggled
+      } catch (error) {
+        reportPluginError('workspace toggle failed', error)
+        notifyError(error, t('messageTabOpeningUnavailable'))
+        return false
+      }
     }
-    openVaultTab = function(path) { return showVaultWorkspace({ newTab: true, path: path || '' }) }
+    openVaultTab = function(path) { return showVaultWorkspace({ newTab: true, path: path || '', workspaceKey: sessionWorkspacesEnabled ? activeWorkspaceKey : 'global' }) }
+    changeWorkspaceModeRuntime = function(enabled) {
+      const next = Boolean(enabled)
+      if (next === sessionWorkspacesEnabled) return
+      activeWorkspaceKey = focusedWorkspaceIdentity(host && host.state)
+      if (next) {
+        Array.from(vaultTabs.values()).forEach(function(tab) {
+          if (!tab.pinned && (tab.workspaceKey === 'global' || !tab.workspaceKey)) tab.workspaceKey = activeWorkspaceKey
+        })
+        workspaceOpenState.set(activeWorkspaceKey, !workspaceHidden && Array.from(vaultTabs.values()).some(function(tab) { return !tab.pinned && tab.workspaceKey === activeWorkspaceKey }))
+      } else {
+        Array.from(vaultTabs.values()).forEach(function(tab) {
+          if (!tab.pinned && tab.workspaceKey === activeWorkspaceKey) tab.workspaceKey = 'global'
+        })
+        workspaceOpenState.set('global', !workspaceHidden && vaultTabs.size > 0)
+      }
+      setSessionWorkspacesEnabled(next)
+      persistVaultTabs.lastWorkspaceSignature = ''
+      persistVaultTabs()
+    }
     const stopConversationListener = listenVaultConversationChanges(host && host.state, function() {
       if (conversationRestoreTimer != null) clearTimeout(conversationRestoreTimer)
       conversationRestoreTimer = setTimeout(function() {
         conversationRestoreTimer = null
-        if (disposed || workspaceHidden) return
-        const selected = activeVaultTabId
-        const tabs = Array.from(vaultTabs.values()).filter(function(tab) { return !tab.suspended })
-        tabs.sort(function(a, b) { return Number(a.tabId === selected) - Number(b.tabId === selected) })
-        tabs.forEach(function(tab) { showVaultWorkspace({ tabId: tab.tabId, path: tab.path || '' }) })
+        if (disposed) return
+        const vaultWasVisible = !workspaceHidden && isVaultWorkspaceVisible()
+        const previousKey = activeWorkspaceKey
+        const nextKey = focusedWorkspaceIdentity(host && host.state)
+        const promotesProvisionalWorkspace = previousKey.endsWith('::new') || previousKey.includes('::runtime:')
+        if (previousKey !== nextKey && promotesProvisionalWorkspace && nextKey.includes('::session:') && previousKey.split('::')[0] === nextKey.split('::')[0] && !workspaceOpenState.has(nextKey)) {
+          Array.from(vaultTabs.values()).forEach(function(tab) { if (!tab.pinned && tab.workspaceKey === previousKey) tab.workspaceKey = nextKey })
+          if (workspaceOpenState.has(previousKey)) workspaceOpenState.set(nextKey, workspaceOpenState.get(previousKey))
+          if (workspaceActiveTab.has(previousKey)) workspaceActiveTab.set(nextKey, workspaceActiveTab.get(previousKey))
+          workspaceOpenState.delete(previousKey)
+          workspaceActiveTab.delete(previousKey)
+        }
+        activeWorkspaceKey = nextKey
+        if (!sessionWorkspacesEnabled) {
+          if (workspaceHidden) return
+          const selected = activeVaultTabId
+          const tabs = Array.from(vaultTabs.values()).filter(function(tab) { return !tab.suspended })
+          tabs.sort(function(a, b) { return Number(a.tabId === selected) - Number(b.tabId === selected) })
+          tabs.forEach(function(tab) { showVaultWorkspace({ tabId: tab.tabId, path: tab.path || '' }) })
+          return
+        }
+        Array.from(vaultTabs.values()).forEach(function(tab) {
+          if (tab.pinned || tab.workspaceKey === nextKey || typeof tab.close !== 'function') return
+          const close = tab.close
+          tab.close = null
+          tab.suspended = true
+          try { close() } catch (error) { reportPluginError('workspace session suspend failed', error) }
+        })
+        persistVaultTabs()
+        const targetOpen = workspaceOpenState.get(nextKey) !== false
+        workspaceHidden = !targetOpen
+        if (!targetOpen) {
+          Array.from(vaultTabs.values()).forEach(function(tab) {
+            if (!tab.pinned || typeof tab.close !== 'function') return
+            const close = tab.close
+            tab.close = null
+            tab.suspended = true
+            try { close() } catch (error) { reportPluginError('workspace session suspend failed', error) }
+          })
+          persistVaultTabs()
+          vaultActivityListeners.forEach(function(listener) { listener() })
+          return
+        }
+        const previouslyActive = vaultTabs.get(activeVaultTabId)
+        const targetActive = previouslyActive && previouslyActive.pinned ? previouslyActive.tabId : workspaceActiveTab.get(nextKey)
+        const tabs = Array.from(vaultTabs.values()).filter(function(tab) {
+          return tab.pinned || (tab.workspaceKey === nextKey && workspaceOpenState.get(nextKey) !== false)
+        })
+        tabs.sort(function(a, b) { return Number(a.tabId === targetActive) - Number(b.tabId === targetActive) })
+        tabs.forEach(function(tab) { showVaultWorkspace({ tabId: tab.tabId, path: tab.path || '', workspaceKey: tab.workspaceKey, pinned: tab.pinned, snapshot: tab.snapshot }) })
+        if (!tabs.length && vaultWasVisible && workspaceOpenState.get(nextKey) !== false) showVaultWorkspace({ newTab: true, workspaceKey: nextKey })
       }, 150)
     })
     async function pollAgentBridge() {
@@ -7367,7 +7869,8 @@ export default {
           storageSet(STORAGE_AGENT_COMMAND_ID, command.id)
           return
         }
-        if (command.tabId && !vaultTabs.has(command.tabId)) {
+        const requestedTab = command.tabId ? vaultTabs.get(command.tabId) : null
+        if (command.tabId && (!requestedTab || requestedTab.pinned || !tabIsVisibleInWorkspace(requestedTab))) {
           await writeVaultAgentResult(vaultPath, command, { ok: false, message: t('messageUnknownOrClosedTabUseListTabsBeforeTargeting') })
         } else if (command.action === 'open-tabs') {
           if (!command.paths || !command.paths.length || command.paths.length > 32 || command.paths.some(function(path) { return typeof path !== 'string' || !path.trim() })) {
@@ -7423,7 +7926,8 @@ export default {
             resolvedPath = matches[0]
             command.path = resolvedPath
           }
-          const targetTabId = showVaultWorkspace({ newTab: command.action === 'open-tab', tabId: command.tabId || activeVaultTabId, path: resolvedPath })
+          const sessionTarget = command.tabId || workspaceActiveTab.get(sessionWorkspacesEnabled ? activeWorkspaceKey : 'global') || ''
+          const targetTabId = showVaultWorkspace({ newTab: command.action === 'open-tab', tabId: sessionTarget || undefined, path: resolvedPath, workspaceKey: sessionWorkspacesEnabled ? activeWorkspaceKey : 'global' })
           if (!targetTabId) return
           command.tabId = targetTabId
           notifyVaultAgentCommand(command)
@@ -7454,27 +7958,58 @@ export default {
       const restoreWorkspaceTabs = function() {
         if (disposed || workspaceTouched) return
         initialOpenTimer = null
-        Promise.all([storageGet(STORAGE_TABS, null), storageGet(STORAGE_RESTORE_TABS, 'on')]).then(function(values) {
+        Promise.all([
+          storageGet(STORAGE_SESSION_WORKSPACES, null),
+          storageGet(STORAGE_TABS, null),
+          storageGet(STORAGE_RESTORE_TABS, 'on'),
+          storageGet(STORAGE_SESSION_WORKSPACES_ENABLED, 'off'),
+          storageGet(STORAGE_WORKSPACE_OPEN, 'closed'),
+        ]).then(function(values) {
           if (disposed || workspaceTouched) return
-          const saved = values[0]
-          if (values[1] === 'off') {
-            showVaultWorkspace()
+          const savedWorkspaces = values[0]
+          const savedLegacy = values[1]
+          const restoreTabs = values[2] !== 'off'
+          setSessionWorkspacesEnabled(values[3] === 'on', false)
+          activeWorkspaceKey = focusedWorkspaceIdentity(host && host.state)
+          workspaceHidden = values[4] !== 'open'
+          const storedTabs = []
+          if (restoreTabs && savedWorkspaces && savedWorkspaces.version === WORKSPACE_STORAGE_VERSION && savedWorkspaces.workspaces && typeof savedWorkspaces.workspaces === 'object') {
+            Object.keys(savedWorkspaces.workspaces).forEach(function(key) {
+              const workspace = savedWorkspaces.workspaces[key]
+              if (!workspace || typeof workspace !== 'object') return
+              workspaceOpenState.set(key, workspace.open !== false)
+              if (typeof workspace.activeTabId === 'string' && workspace.activeTabId) workspaceActiveTab.set(key, workspace.activeTabId)
+              if (Array.isArray(workspace.tabs)) workspace.tabs.forEach(function(tab) { storedTabs.push(Object.assign({}, tab, { workspaceKey: key, pinned: false })) })
+            })
+            if (Array.isArray(savedWorkspaces.pinnedTabs)) savedWorkspaces.pinnedTabs.forEach(function(tab) { storedTabs.push(Object.assign({}, tab, { pinned: true })) })
+            if (typeof savedWorkspaces.activeTabId === 'string') activeVaultTabId = savedWorkspaces.activeTabId
+          } else if (restoreTabs && savedLegacy && Array.isArray(savedLegacy.tabs)) {
+            savedLegacy.tabs.forEach(function(tab) { storedTabs.push(Object.assign({}, tab, { workspaceKey: sessionWorkspacesEnabled ? activeWorkspaceKey : 'global', pinned: false })) })
+            if (typeof savedLegacy.activeTabId === 'string') activeVaultTabId = savedLegacy.activeTabId
+          }
+          if (sessionWorkspacesEnabled) {
+            workspaceHidden = workspaceOpenState.has(activeWorkspaceKey)
+              ? workspaceOpenState.get(activeWorkspaceKey) === false
+              : true
+          }
+          storedTabs.map(validStoredTab).filter(Boolean).forEach(function(tab) { vaultTabs.set(tab.tabId, tab) })
+          workspaceStorageReady = true
+          if (!restoreTabs) {
+            if (!workspaceHidden) showVaultWorkspace({ workspaceKey: sessionWorkspacesEnabled ? activeWorkspaceKey : 'global' })
             return
           }
-          if (saved && Array.isArray(saved.tabs) && saved.tabs.length) {
-            const tabs = saved.tabs.filter(function(tab) { return tab && typeof tab.tabId === 'string' && (tab.tabId === DEFAULT_TAB_ID || tab.tabId.startsWith(ID + ':tab:')) })
-            tabs.sort(function(a, b) { return Number(a.tabId === saved.activeTabId) - Number(b.tabId === saved.activeTabId) })
-            tabs.forEach(function(tab) { showVaultWorkspace({ tabId: tab.tabId, path: tab.path || '' }) })
-          } else showVaultWorkspace()
+          const visible = Array.from(vaultTabs.values()).filter(function(tab) {
+            if (!tabIsVisibleInWorkspace(tab)) return false
+            return tab.pinned || workspaceOpenState.get(tab.workspaceKey) !== false
+          })
+          const restoredActive = vaultTabs.get(activeVaultTabId)
+          const selected = restoredActive && restoredActive.pinned ? activeVaultTabId : (workspaceActiveTab.get(sessionWorkspacesEnabled ? activeWorkspaceKey : 'global') || activeVaultTabId)
+          visible.sort(function(a, b) { return Number(a.tabId === selected) - Number(b.tabId === selected) })
+          if (!workspaceHidden) visible.forEach(function(tab) { showVaultWorkspace({ tabId: tab.tabId, path: tab.path || '', workspaceKey: tab.workspaceKey, pinned: tab.pinned, snapshot: tab.snapshot }) })
+          if (!workspaceHidden && !visible.length && values[4] === 'open' && !sessionWorkspacesEnabled) showVaultWorkspace({ workspaceKey: 'global' })
         })
       }
-      Promise.resolve(storageGet(STORAGE_WORKSPACE_OPEN, 'closed')).then(function(state) {
-        if (!disposed && !workspaceTouched && state === 'open') {
-          initialOpenTimer = setTimeout(restoreWorkspaceTabs, 0)
-        }
-      }).catch(function(error) {
-        reportPluginError('workspace state restore failed', error)
-      })
+      initialOpenTimer = setTimeout(restoreWorkspaceTabs, 0)
     } else {
       ctx.register({
         id: 'pane',
@@ -7500,6 +8035,7 @@ export default {
       stopConversationListener()
       if (imageDetailDialog) imageDetailDialog.close()
       openVaultTab = null
+      changeWorkspaceModeRuntime = null
       vaultTabs.forEach(function(tab) {
         if (tab.visibilityStop) { tab.visibilityStop(); tab.visibilityStop = null }
       })
@@ -7508,15 +8044,14 @@ export default {
     })
     ctx.register({
       id: 'show-vault-titlebar',
-      area: 'titleBar.tools.right',
-      order: 80,
-      data: {
-        id: 'show-vault-titlebar',
-        label: ctx.i18n.t('toggleVault'),
-        title: ctx.i18n.t('toggleVault'),
-        icon: jsx(Codicon, { name: 'library' }),
-        onSelect: toggleVaultWorkspace,
-        tour: 'vault-view-show',
+      area: 'titleBar.right',
+      order: -1000,
+      render: function() {
+        return jsx(VaultTitlebarToggle, {
+          label: ctx.i18n.t('toggleVault'),
+          onToggle: toggleVaultWorkspace,
+          isActive: hasRegisteredVaultWorkspace,
+        })
       },
     })
     ctx.register({

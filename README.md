@@ -6,21 +6,24 @@
 
 [English](README.md) · [Français](README.fr.md)
 
-[![Release v0.4.8](https://img.shields.io/badge/release-v0.4.8-2563eb)](https://github.com/ergocogn/hermes-desktop-plugin-vault-view/releases/tag/v0.4.8)
+[![Release v0.5.0](https://img.shields.io/badge/release-v0.5.0-2563eb)](https://github.com/ergocogn/hermes-desktop-plugin-vault-view/releases/tag/v0.5.0)
 [![Install in Hermes Desktop](https://img.shields.io/badge/Install%20in-Hermes%20Desktop-2563eb)](hermes://plugin/install?repo=ergocogn/hermes-desktop-plugin-vault-view)
 
 ![Vault View displaying a linked Markdown note, explorer, outline, and graph inside Hermes Desktop](screenshots/vault-view-light.png)
 
 Vault View brings your Markdown knowledge base into the conversation. Find a note, ask Hermes to create or update it, follow its links, and keep several notes open in a workspace designed for a vault—not a generic file preview.
 
-## What is new in 0.4.8
+## What is new in 0.5.0
 
-- Keep the plugin inside its own UI root: remove Hermes transcript and tab-strip DOM access. Workspace tab selection uses the public SDK visibility atom.
-- Complete English and French labels for code copying, callouts, links, images and agent context.
-- Keep remote-image updates inside Vault View and preserve the plugin's direct-install entry point.
+- Keep an optional workspace for each conversation, including its open and closed tabs, active note, navigation, editing state, previews and unsaved drafts. Pin several tabs globally when they should remain visible across conversations.
+- Quote an explicit note selection into the active Hermes conversation from reading, visual editing or Markdown source. The user action inserts a Markdown block quote and never persists the selection.
+- Create or open a note directly from a localized empty-workspace card, and keep the global Vault View toggle available even when no note is open.
+- Wrap the main and formatting toolbars at narrow container widths and align controls, menus, dialogs, focus states and empty cards with Hermes theme variables.
+- Migrate legacy tab state into versioned workspace storage without changing notes or attachments.
 
-## Previous changes in 0.4.7
+## Previous catalog review corrections in 0.4.8 and 0.4.7
 
+- Keep the plugin inside its own UI root, use public workspace APIs and preserve the direct-install entry point.
 - SDK-sandboxed web previews, with Hermes >=0.21.5 required.
 - Separate agent navigation guidance and remote-image settings, both off by default.
 - Complete English/French errors, dialogs, bridge messages and formatting defaults.
@@ -29,7 +32,7 @@ Vault View brings your Markdown knowledge base into the conversation. Find a not
 - Faster navigation with bounded, revision-aware caches and progressive reading.
 - Live Markdown styling, source preservation, tag search and responsive sidebars.
 - Lazy image previews, a detail viewer, and image/text/code attachment previews.
-- Shared note tabs across conversations, editing undo/redo and private incident diagnostics.
+- Shared note tabs, editing undo/redo and private incident diagnostics.
 
 Raster thumbnails use ffmpeg when available; original images remain available as a fallback. The filesystem transport requires Unix/WSL shell utilities. Direct Obsidian opening is temporarily hidden; external application opening depends on the host/backend configuration. Native Windows/macOS launch validation remains incomplete.
 
@@ -50,6 +53,9 @@ See [CHANGELOG.md](CHANGELOG.md) for the complete changes and [AGENTS.md](AGENTS
 - Search, explorer, outline, tags, backlinks, outgoing links, and vault graph
 - Wikilinks, Obsidian callouts, and local images
 - Multiple tabs with independent navigation history
+- Explicitly quote a selected note passage into the active conversation
+- Optional per-conversation workspaces (off by default), with multiple globally pinned tabs
+- Responsive toolbars that wrap to the actual Vault View container width
 - Automatic refresh after changes made by Hermes, Obsidian CLI, or another editor
 - Light and dark Hermes theme support
 - English, French, or automatic Hermes Desktop language selection
@@ -86,7 +92,9 @@ Use the plugin directory shown by Hermes Desktop. The Desktop application and it
 
 Vault View automatically looks for the vault already configured through Hermes `WIKI_PATH`. If no valid `.obsidian` vault is found, select its root in the settings panel.
 
-The language setting offers **Follow Hermes Desktop**, **English**, and **Français**. The same panel controls tab restoration, panel layout, optional active-note metadata sharing, agent navigation guidance and remote images. All sharing/network options are independent and disabled by default.
+The language setting offers **Follow Hermes Desktop**, **English**, and **Français**. The same panel controls tab restoration, optional per-conversation workspaces, panel layout, optional active-note metadata sharing, agent navigation guidance and remote images. Per-conversation workspaces are off by default; when enabled, each conversation retains its own open/closed tabs and drafts, while pinned tabs remain visible everywhere. All sharing/network options are independent and disabled by default.
+
+Selecting text inside a note enables the quote action in the top toolbar and adds **Copy selection** and **Quote selection in the conversation** to the note context menu. Quoting is always an explicit user action, targets the currently active Hermes conversation, and does not store the selection.
 
 ## Privacy
 

@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.5.0 - 2026-10-07
+
+### Added
+
+- Quote an explicit note selection into the active Hermes conversation from the toolbar or the note-only context menu. The user action inserts a Markdown block quote and never persists the selection.
+- Optional per-conversation workspaces, disabled by default, with independent open/closed tabs, active note, navigation, editor mode, previews and unsaved drafts. Multiple pinned tabs remain visible across conversations.
+- A localized empty-workspace card with direct create/open actions.
+
+### Changed
+
+- Let the main and formatting toolbars wrap at narrow container widths, improve long-path wrapping, and harmonize themed buttons, menus, focus states and empty cards without changing the three-column layout.
+- Add versioned workspace storage and migrate legacy tab state without modifying note files or attachments.
+
 ## 0.4.8 - 2026-10-04
 
 ### Fixed

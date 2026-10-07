@@ -11,7 +11,15 @@ source = source.replace(
   `
 globalThis.__vaultViewTest = {
   ID, VERSION, attachVaultCapabilitiesToDraft, compactVaultContext, detectConfiguredVaultPath, filterVaultNotes, findAgentNoteMatches, isVaultRelevantRequest, validDetectedPath,
-  setRuntime: function(ctx, session) { pluginCtx = ctx; vaultSessionContext = session }
+  formatSelectionQuote, insertSelectionQuote, focusedWorkspaceIdentity, validStoredTab, serializeVaultTab, resolveVaultActivePath,
+  setRuntime: function(ctx, session) { pluginCtx = ctx; vaultSessionContext = session },
+  setWorkspaceModel: function(enabled, key, tabs) {
+    sessionWorkspacesEnabled = enabled
+    activeWorkspaceKey = key
+    vaultTabs.clear()
+    tabs.forEach(function(tab) { vaultTabs.set(tab.tabId, tab) })
+  },
+  visibleTabIds: function() { return Array.from(vaultTabs.values()).filter(function(tab) { return tabIsVisibleInWorkspace(tab) }).map(function(tab) { return tab.tabId }) }
 }
 globalThis.__vaultViewPlugin = {`
 )
@@ -75,9 +83,37 @@ assert.deepEqual(Array.from(api.filterVaultNotes(tagFiles, '/vault', '#project/p
 assert.deepEqual(Array.from(api.filterVaultNotes(tagFiles, '/vault', '#missing', tagContents)), [])
 assert.deepEqual(Array.from(api.filterVaultNotes(tagFiles, '/vault', 'project filename', tagContents)), [tagFiles[4]], 'ordinary filename search still works')
 assert.equal(api.ID, 'vault-view')
-assert.equal(api.VERSION, '0.4.8')
+assert.equal(api.VERSION, '0.5.0')
 assert.equal(api.validDetectedPath('/vault/'), '/vault')
 assert.equal(api.validDetectedPath('/vault\nsecret'), '')
+
+assert.equal(api.formatSelectionQuote('Simple passage'), '> Simple passage')
+assert.equal(api.formatSelectionQuote('\r\nFirst\r\n\r\nSecond\r\n'), '> First\n>\n> Second', 'quotes normalize line endings and preserve internal blank lines')
+assert.equal(api.formatSelectionQuote('First\n  \nSecond'), '> First\n>\n> Second', 'whitespace-only internal lines become empty quote lines')
+assert.equal(api.formatSelectionQuote('\n \t\n'), '', 'blank selections are refused')
+assert.equal(api.resolveVaultActivePath('', ['/vault/Vaultmap.md', '/vault/Z.md'], true), '', 'an intentionally empty session workspace stays empty')
+assert.equal(api.resolveVaultActivePath('', ['/vault/Vaultmap.md', '/vault/Z.md'], false), '/vault/Vaultmap.md', 'global mode keeps its historical first-note fallback')
+assert.equal(api.resolveVaultActivePath('/vault/Z.md', ['/vault/Vaultmap.md', '/vault/Z.md'], true), '/vault/Z.md', 'an existing session note remains selected')
+const atom = value => ({ get: () => value })
+assert.equal(api.focusedWorkspaceIdentity({ focusedSessionProfile: atom('work'), focusedSessionId: atom('draft-1') }), 'work::runtime:draft-1', 'new chats use a distinct provisional workspace')
+assert.equal(api.focusedWorkspaceIdentity({ focusedSessionProfile: atom('work'), focusedStoredSessionId: atom('saved-1'), focusedSessionId: atom('draft-1') }), 'work::session:saved-1', 'durable session identity replaces the provisional key')
+assert.equal(api.validStoredTab({ tabId: 'foreign', path: '/vault/A.md' }), null, 'foreign tab ids are ignored during migration')
+const restoredTab = api.validStoredTab({ tabId: 'vault-view:tab:one', path: '/vault/A.md', workspaceKey: 'profile::session-a', pinned: true, snapshot: { rawContent: 'draft' } })
+assert.equal(restoredTab.pinned, true)
+assert.equal(restoredTab.snapshot.rawContent, 'draft', 'draft snapshots survive storage migration')
+api.setWorkspaceModel(true, 'profile::session-a', [
+  { tabId: 'vault-view:tab:a', workspaceKey: 'profile::session-a', pinned: false },
+  { tabId: 'vault-view:tab:b', workspaceKey: 'profile::session-b', pinned: false },
+  { tabId: 'vault-view:tab:p1', workspaceKey: 'profile::session-b', pinned: true },
+  { tabId: 'vault-view:tab:p2', workspaceKey: 'profile::session-a', pinned: true },
+])
+assert.deepEqual(Array.from(api.visibleTabIds()), ['vault-view:tab:a', 'vault-view:tab:p1', 'vault-view:tab:p2'], 'session workspaces isolate local tabs and retain multiple pinned tabs')
+api.setWorkspaceModel(false, 'profile::session-b', [
+  { tabId: 'vault-view:tab:global', workspaceKey: 'global', pinned: false },
+  { tabId: 'vault-view:tab:parked', workspaceKey: 'profile::session-a', pinned: false },
+  { tabId: 'vault-view:tab:pinned', workspaceKey: 'profile::session-a', pinned: true },
+])
+assert.deepEqual(Array.from(api.visibleTabIds()), ['vault-view:tab:global', 'vault-view:tab:pinned'], 'global mode does not surface parked session tabs')
 
 const root = '/vault'
 const files = [
@@ -116,7 +152,24 @@ assert.doesNotMatch(pluginSource, /(?:[A-Za-z]:\\Users\\|\/home\/)[^/\\\s]+[\\/]
 assert.doesNotMatch(pluginSource, /window\.hermesDesktop/)
 assert.match(pluginSource, /const VAULT_ENV_KEY = 'WIKI_PATH'/)
 assert.match(pluginSource, /ctx\.i18n\.register\(LOCALES\)/)
-assert.match(pluginSource, /onSelect: toggleVaultWorkspace/)
+assert.match(pluginSource, /area: 'titleBar\.right'[\s\S]*?VaultTitlebarToggle/)
+assert.match(pluginSource, /WebkitAppRegion: 'no-drag', order: -1000/)
+assert.match(pluginSource, /font-family:var\(--dt-font-sans,var\(--theme-font-sans/)
+assert.match(pluginSource, /border-radius:var\(--radius-md,5px\)/)
+assert.match(pluginSource, /background:var\(--ui-control-hover-background/)
+assert.match(pluginSource, /box-shadow:var\(--shadow-md/)
+assert.match(pluginSource, /className: 'ov-button ov-primary-button'[\s\S]*?name: 'new-file'/)
+assert.match(pluginSource, /onClick: openEmptyCreate, 'aria-expanded': emptyCreateOpen/)
+assert.match(pluginSource, /className: 'ov-empty-create-form', onSubmit: submitEmptyCreate/)
+assert.match(pluginSource, /const created = await createNoteFromRequestedPath\(emptyCreateName\)/)
+assert.doesNotMatch(pluginSource, /workspaceOptions\.title = title[\s\S]*?host\.openWorkspace\(tabId, workspaceOptions\)/)
+assert.match(pluginSource, /className: 'ov-toolbar-group', children: \[useSessionWorkspaces \? jsx\('button', \{[\s\S]*?ov-pin-button[\s\S]*?name: 'layout-sidebar-left'[\s\S]*?name: 'arrow-left'/)
+assert.match(pluginSource, /className: 'ov-button ov-icon-button' \+ \(editMode \? ' ov-toolbar-active' : ''\)[\s\S]*?'aria-pressed': editMode,[\s\S]*?name: 'edit'/)
+assert.doesNotMatch(pluginSource, /name: editMode \? 'book' : 'edit'/)
+assert.match(pluginSource, /onContextMenuCapture: function\(event\)[\s\S]*?setSelectionMenu\(/)
+assert.match(pluginSource, /selectionMenu\.text\)\) setSelectionMenu\(null\)[\s\S]*?t\('quoteSelection'\)/)
+assert.match(pluginSource, /const vaultWasVisible = !workspaceHidden && isVaultWorkspaceVisible\(\)/)
+assert.match(pluginSource, /!tabs\.length && vaultWasVisible && workspaceOpenState\.get\(nextKey\) !== false/)
 assert.match(pluginSource, /host\.paneVisibility\('plugin-workspace:' \+ tabId\)/)
 assert.match(pluginSource, /function hideVaultWorkspace\(\)/)
 assert.match(pluginSource, /tab\.suspended = true/)
@@ -193,6 +246,13 @@ Promise.all([
   const repeated = await api.attachVaultCapabilitiesToDraft(unshared)
   assert.equal(repeated.attachments.length, 1, 'repeated enrichment does not accumulate context')
   assert.equal((await api.attachVaultCapabilitiesToDraft({ text: 'Bonjour, parlons météo', attachments: [] })).attachments.length, 0, 'unrelated prompts spend no Vault View context')
+  const inserted = []
+  const quoteState = { focusedSessionId: { get: () => 'active-runtime' }, focusedStoredSessionId: { get: () => 'note-owner-session' } }
+  assert.equal(await api.insertSelectionQuote('Selected\n\npassage', quoteState, { insertText: async function(...args) { inserted.push(args); return true } }), true)
+  assert.equal(inserted[0][0], 'active-runtime', 'a pinned note still targets the currently active conversation')
+  assert.equal(inserted[0][1], '> Selected\n>\n> passage')
+  assert.equal(inserted[0][2].mode, 'block')
+  assert.equal(await api.insertSelectionQuote('Selected', quoteState, { insertText: async function() { return false } }), false, 'a missing composer surface is reported without mutating stored state')
   console.log('Vault View tests: OK')
 }).catch(function(error) {
   console.error(error)
