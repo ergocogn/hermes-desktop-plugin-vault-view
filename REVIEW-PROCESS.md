@@ -15,3 +15,7 @@ Use this process for every Vault View catalog candidate. Record the exact public
 Run `node tests/verify.cjs --browser` with Playwright/Chromium available. Review the code and behavior beyond patterns covered by those tests. Run the official plugin and catalog validators, inspect their warnings, and record any unavailable checks. Test supported gateway and native application behavior on the relevant operating systems; mocked launches are only unit evidence.
 
 Before publishing, confirm entry-point parity, manifest and documentation version, tag target, exact catalog and image pins, and separate development and public Git states. Verify the installed files and the module actually loaded in Hermes separately. Use only synthetic notes and screenshots in public evidence.
+
+## Current reviewed upstream
+
+The 0.5.0 candidate was reviewed on 2026-10-07 against Hermes upstream commit `a50406d9b7474b060450d2dcaff8743c977d296a`. Exact validator results and checks not performed are recorded in RELEASE-REVIEW.md.
