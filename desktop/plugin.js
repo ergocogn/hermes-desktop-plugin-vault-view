@@ -7665,6 +7665,10 @@ export default {
       const previewAnchor = previousTab && tabIsVisibleInWorkspace(previousTab) && previousTabId !== tabId ? 'plugin-workspace:' + previousTabId : ''
       vaultTabs.set(tabId, tab)
       if (!tab.pinned) workspaceOpenState.set(tab.workspaceKey, true)
+      // onClose may arrive after a pane disposer returns. Keep the intent on
+      // the individual registration so a delayed callback from a hide or
+      // session switch cannot delete a tab that has already been restored.
+      const registration = { suspended: false, visibilityStop: null }
       const workspaceOptions = {
         dock: previewAnchor
           ? { before: previewAnchor, pane: previewAnchor, pos: 'center' }
@@ -7672,10 +7676,17 @@ export default {
         minWidth: '36rem',
         title: tab.title,
         onClose: function() {
-          if (tab.visibilityStop) { tab.visibilityStop(); tab.visibilityStop = null }
+          if (registration.visibilityStop) {
+            registration.visibilityStop()
+            if (tab.visibilityStop === registration.visibilityStop) tab.visibilityStop = null
+            registration.visibilityStop = null
+          }
           if (disposed) return
-          if (tab.suspended) {
-            tab.close = null
+          if (registration.suspended || tab.registration !== registration || tab.suspended) {
+            if (tab.registration === registration) {
+              tab.close = null
+              tab.registration = null
+            }
             return
           }
           vaultTabs.delete(tabId)
@@ -7705,7 +7716,9 @@ export default {
         }),
       }
       try {
-        tab.close = host.openWorkspace(tabId, workspaceOptions)
+        registration.close = host.openWorkspace(tabId, workspaceOptions)
+        tab.registration = registration
+        tab.close = registration.close
       } catch (error) {
         if (!existing) vaultTabs.delete(tabId)
         throw error
@@ -7716,9 +7729,10 @@ export default {
         try {
           const visibility = host.paneVisibility('plugin-workspace:' + tabId)
           if (visibility && typeof visibility.listen === 'function') {
-            tab.visibilityStop = visibility.listen(function(visible) {
+            registration.visibilityStop = visibility.listen(function(visible) {
               if (visible && !disposed && !tab.suspended) selectVaultTab(tabId)
             })
+            tab.visibilityStop = registration.visibilityStop
           }
         } catch (error) { reportPluginError('workspace visibility unavailable', error) }
       }
@@ -7742,6 +7756,15 @@ export default {
       tabs.sort(function(a, b) { return Number(a.tabId === activeVaultTabId) - Number(b.tabId === activeVaultTabId) })
       tabs.forEach(function(tab) {
         const close = tab.close
+        if (tab.registration) {
+          tab.registration.suspended = true
+          if (tab.registration.visibilityStop) {
+            const visibilityStop = tab.registration.visibilityStop
+            tab.registration.visibilityStop = null
+            if (tab.visibilityStop === visibilityStop) tab.visibilityStop = null
+            visibilityStop()
+          }
+        }
         tab.close = null
         tab.suspended = true
         try { close() } catch (error) { reportPluginError('workspace hide failed', error) }
@@ -7825,6 +7848,15 @@ export default {
         Array.from(vaultTabs.values()).forEach(function(tab) {
           if (tab.pinned || tab.workspaceKey === nextKey || typeof tab.close !== 'function') return
           const close = tab.close
+          if (tab.registration) {
+            tab.registration.suspended = true
+            if (tab.registration.visibilityStop) {
+              const visibilityStop = tab.registration.visibilityStop
+              tab.registration.visibilityStop = null
+              if (tab.visibilityStop === visibilityStop) tab.visibilityStop = null
+              visibilityStop()
+            }
+          }
           tab.close = null
           tab.suspended = true
           try { close() } catch (error) { reportPluginError('workspace session suspend failed', error) }
@@ -7836,6 +7868,15 @@ export default {
           Array.from(vaultTabs.values()).forEach(function(tab) {
             if (!tab.pinned || typeof tab.close !== 'function') return
             const close = tab.close
+            if (tab.registration) {
+              tab.registration.suspended = true
+              if (tab.registration.visibilityStop) {
+                const visibilityStop = tab.registration.visibilityStop
+                tab.registration.visibilityStop = null
+                if (tab.visibilityStop === visibilityStop) tab.visibilityStop = null
+                visibilityStop()
+              }
+            }
             tab.close = null
             tab.suspended = true
             try { close() } catch (error) { reportPluginError('workspace session suspend failed', error) }
