@@ -8,7 +8,7 @@ let locale = 'en'
 const frame = function SandboxedFrame() {}
 const sandbox = {
   console, TextEncoder, TextDecoder, Uint8Array, URL, btoa, atob,
-  host: { request: async () => ({ error: 'synthetic failure' }) },
+  host: { request: async () => ({ error: 'synthetic failure' }), state: { focusedSessionId: { get: () => 'runtime-1' } } },
   jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }),
   useState: value => [value, () => {}], useRef: value => ({ current: value }),
   useEffect() {}, useCallback: fn => fn,
@@ -47,6 +47,11 @@ api.configure()
   assert.equal(api.t('imagePlaceholderPath'), 'path/image.png')
   api.setVaultUiLanguage('auto', false)
   await assert.rejects(api.shellExec('synthetic'), /La requête shell a échoué/)
+  sandbox.host.state = {}
+  sandbox.host.request = async () => { throw new Error('invalid_params') }
+  await assert.rejects(api.shellExec('synthetic'), /Ouvrez d'abord une conversation Hermes/, 'a session-scoped gateway without a focused session yields a localized refusal')
+  sandbox.host.request = async () => ({ error: 'synthetic failure' })
+  sandbox.host.state = { focusedSessionId: { get: () => 'runtime-1' } }
   const draft = { text: 'Open Note in Obsidian', attachments: [{ id: 'user-file', refText: 'user reference' }] }
   settings.set('vault-view:vault-path', '/vault')
   assert.strictEqual(await api.attachVaultCapabilitiesToDraft(draft), draft, 'guidance and sharing are off by default')

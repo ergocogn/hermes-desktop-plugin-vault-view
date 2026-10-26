@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Send the focused Hermes session id with `shell.exec` so vault detection, reading and saving work on Hermes 0.22.1 and later, which run shell commands for one local session. Gateways that refuse the `session_id` key are served by a retry without it. When no conversation is focused, the plugin reports it in English and French instead of "not a valid Obsidian vault".
+- Save a note in bounded 2,400-byte chunks instead of one base64 command so large notes no longer stall the gateway's command scan or hit the 128,000-character command limit (notes over ~95 KB previously could not be saved at all). Shrink the `od` hex read fallback from 900- to 600-byte blocks so its raw output stays under the 4,000-character stdout tail on both GNU and BSD `od`, fixing a handful of reads that silently failed on macOS.
+
 ## 0.5.0 - 2026-10-07
 
 ### Added

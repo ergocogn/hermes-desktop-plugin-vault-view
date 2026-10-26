@@ -68,6 +68,7 @@ const LOCALES = {
     messageFindANoteOrTag: "Find a note or #tag…",
     messageIndexingTags: "Indexing tags…",
     messageNoResults: "No results",
+    messageNoActiveConversation: "Open a Hermes conversation first: Vault View runs its file commands through the active session",
     messageTheShellRequestFailed: "The shell request failed",
     messageTheShellCommandFailed: "The shell command failed",
     messageTheCommandFailedWithExitCode: "The command failed with exit code ",
@@ -250,6 +251,7 @@ const LOCALES = {
     messageFindANoteOrTag: "Rechercher une note ou #tag…",
     messageIndexingTags: "Recherche des tags…",
     messageNoResults: "Aucun résultat",
+    messageNoActiveConversation: "Ouvrez d'abord une conversation Hermes : Vault View exécute ses commandes de fichiers via la session active",
     messageTheShellRequestFailed: "La requête shell a échoué",
     messageTheShellCommandFailed: "La commande shell a échoué",
     messageTheCommandFailedWithExitCode: "La commande a échoué avec le code ",
@@ -918,8 +920,29 @@ function readThemeColor(el, name, fallbackName) {
   return (style.getPropertyValue(name) || style.getPropertyValue(fallbackName) || style.color || '').trim()
 }
 
+function shellSessionId(state = host && host.state) {
+  const focused = readHostAtom(state && state.focusedSessionId, null)
+  const active = readHostAtom(state && state.activeSessionId, null)
+  return String(focused || active || '')
+}
+
+function isInvalidParamsError(error) {
+  const reason = error && (error.message || error.reason || (error.data && error.data.reason))
+  return String(reason || '') === 'invalid_params'
+}
+
 async function shellExec(command) {
-  const response = await host.request('shell.exec', { command: command })
+  const sessionId = shellSessionId()
+  let response
+  try {
+    // Hermes >= 0.22.1 runs shell.exec for one local session and requires its runtime id;
+    // earlier gateways refuse the session_id key, so the request is retried without it.
+    response = await host.request('shell.exec', sessionId ? { command: command, session_id: sessionId } : { command: command })
+  } catch (error) {
+    if (!isInvalidParamsError(error)) throw error
+    if (!sessionId) throw new Error(t('messageNoActiveConversation'))
+    response = await host.request('shell.exec', { command: command })
+  }
   const payload = response && response.result ? response.result : response
   if (response && response.error) throw new Error(t('messageTheShellRequestFailed'))
   if (payload && payload.error) throw new Error(t('messageTheShellCommandFailed'))
@@ -1113,8 +1136,11 @@ async function readVaultFileBytes(path, isCancelled = function() { return false 
       binary = atob(encoded)
       if (binary.length !== expected) throw new Error('Invalid block size')
     } catch {
-      for (let part = 0; part < expected; part += 900) {
-        const length = Math.min(900, expected - part)
+      // 600-byte hex blocks: od -An -v -tx1 prints ~3.06 raw chars/byte on GNU (measured) and
+      // was reported at ~4.67 chars/byte on BSD od (macOS); 600 bytes stays under ~2,800 chars
+      // on either format, safely below the 4,000-char stdout tail shell.exec returns.
+      for (let part = 0; part < expected; part += 600) {
+        const length = Math.min(600, expected - part)
         const command = 'tail -c +' + (offset + part + 1) + ' ' + quotedPath + ' | head -c ' + length + ' | od -An -v -tx1'
         let hex = ''
         for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -1344,10 +1370,19 @@ async function saveNoteFile(path, content) {
   // Base64 en voie principale : le contenu ne traverse plus l'interprétation du shell en
   // texte brut. C'est ce qui abîmait les séquences UTF-8 (un \xe2 perdu dans C'est faisait
   // échouer la relecture suivante avec TextDecoder en mode fatal).
-  const encoded = bytesToBase64(content)
+  const bytes = new TextEncoder().encode(content)
   const temporary = cleanPath + '.tmp-' + Date.now() + '-' + Math.random().toString(36).slice(2)
+  // Write in bounded chunks: Hermes scans each shell.exec command's text synchronously before
+  // running it, and scan time grows sharply with command length (measured ~1s/10KB up to
+  // ~90s/88KB, with commands over 128,000 chars refused outright). Matches the 2,400-byte
+  // chunk already proven for reads; a multiple of 3 so only the final chunk needs base64 padding.
+  const saveChunkBytes = 2400
   try {
-    await shellExec('printf %s ' + shellQuote(encoded) + ' | base64 -d > ' + shellQuote(temporary))
+    for (let offset = 0; offset === 0 || offset < bytes.length; offset += saveChunkBytes) {
+      const chunk = encodeBase64Bytes(bytes.subarray(offset, offset + saveChunkBytes))
+      const redirect = offset === 0 ? '> ' : '>> '
+      await shellExec('printf %s ' + shellQuote(chunk) + ' | base64 -d ' + redirect + shellQuote(temporary))
+    }
     // Écriture atomique : la note n'est jamais remplacée à moitié. On relit ce qu'on vient
     // d'écrire avant de basculer dessus, pour ne pas écraser une note saine avec du tronqué.
     const ecrit = getStdout(await shellExec('wc -c < ' + shellQuote(temporary))).trim()

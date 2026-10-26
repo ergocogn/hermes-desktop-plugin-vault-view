@@ -10,7 +10,7 @@ source = source.replace(
   '\nexport default {',
   `
 globalThis.__vaultViewTest = {
-  ID, VERSION, attachVaultCapabilitiesToDraft, compactVaultContext, detectConfiguredVaultPath, filterVaultNotes, findAgentNoteMatches, isVaultRelevantRequest, validDetectedPath,
+  ID, VERSION, attachVaultCapabilitiesToDraft, compactVaultContext, detectConfiguredVaultPath, filterVaultNotes, findAgentNoteMatches, isVaultRelevantRequest, shellSessionId, validDetectedPath,
   formatSelectionQuote, insertSelectionQuote, focusedWorkspaceIdentity, validStoredTab, serializeVaultTab, resolveVaultActivePath,
   setRuntime: function(ctx, session) { pluginCtx = ctx; vaultSessionContext = session },
   setWorkspaceModel: function(enabled, key, tabs) {
@@ -200,8 +200,15 @@ api.setRuntime({
 }, { activePath: '', shareWithAgent: false })
 
 const detectionCommands = []
+sandbox.host.state = { focusedSessionId: atom('runtime-1'), activeSessionId: atom('runtime-main') }
+assert.equal(api.shellSessionId({ focusedSessionId: atom(null), activeSessionId: atom('runtime-main') }), 'runtime-main', 'the active session serves when no tile is focused')
+assert.equal(api.shellSessionId({}), '', 'a fresh draft has no runtime session')
+let legacyGateway = false
 sandbox.host.request = async function(method, payload) {
   assert.equal(method, 'shell.exec')
+  if (legacyGateway && 'session_id' in payload) throw new Error('invalid_params')
+  if (!legacyGateway && !payload.session_id) throw new Error('invalid_params')
+  if (!legacyGateway) assert.equal(payload.session_id, 'runtime-1', 'shell.exec carries the focused runtime session id')
   detectionCommands.push(payload.command)
   return { result: { code: 0, stdout: payload.command.includes("printf 'valid'") ? 'valid' : '/vault\n', stderr: '' } }
 }
@@ -219,6 +226,14 @@ Promise.all([
   assert.doesNotMatch(results[1].attachments[0].refText, /\/vault(?:\/|\b)/)
   assert.equal(results[2], '/vault')
   assert.equal(detectionCommands.length, 2)
+  sandbox.host.state = {}
+  assert.equal(await api.detectConfiguredVaultPath(), '', 'detection fails closed when the gateway requires a session and none is focused')
+  assert.equal(detectionCommands.length, 2, 'a refused request without a session id is not retried')
+  legacyGateway = true
+  sandbox.host.state = { focusedSessionId: atom('runtime-1') }
+  assert.equal(await api.detectConfiguredVaultPath(), '/vault', 'a gateway refusing session_id is served by the retry without it')
+  assert.equal(detectionCommands.length, 4)
+  legacyGateway = false
   assert.match(detectionCommands[0], /WIKI_PATH/)
   assert.match(detectionCommands[0], /candidate%\/\*/)
   assert.doesNotMatch(detectionCommands.join('\n'), /\.env/)

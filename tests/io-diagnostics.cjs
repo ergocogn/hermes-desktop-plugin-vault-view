@@ -8,6 +8,7 @@ let tamper = false
 let reads = 0
 const files = new Map([['/vault/note.md', Buffer.from('original')], ['/vault/image.png', Buffer.from('image-one')]])
 const persisted = []
+let saveCommands = []
 const sandbox = {
   console: { error() {} }, TextDecoder, TextEncoder, Uint8Array, atob, btoa,
   Date: class extends Date { static now() { return now } },
@@ -15,10 +16,12 @@ const sandbox = {
   host: { notifyError() {}, request: async (_, { command }) => {
     let stdout = ''
     if (command.startsWith('printf %s ')) {
-      const matches = command.match(/printf %s '([^']*)'.*> '([^']+)'/)
-      const bytes = Buffer.from(matches[1], 'base64')
-      if (tamper && bytes.length) bytes[0] ^= 1
-      files.set(matches[2], bytes)
+      const matches = command.match(/printf %s '([^']*)'.*base64 -d (>>?) '([^']+)'/)
+      const chunk = Buffer.from(matches[1], 'base64')
+      const append = matches[2] === '>>'
+      if (tamper && !append && chunk.length) chunk[0] ^= 1
+      saveCommands.push({ target: matches[3], bytes: chunk.length, append: append })
+      files.set(matches[3], append && files.has(matches[3]) ? Buffer.concat([files.get(matches[3]), chunk]) : Buffer.from(chunk))
     } else if (command.startsWith('cp -p')) {
       const matches = command.match(/cp -p '([^']+)' '([^']+)'/)
       files.set(matches[2], Buffer.from(files.get(matches[1])))
@@ -103,8 +106,13 @@ api.setContext({ storage: { set(_, value) { persisted.push(JSON.stringify(value)
   assert.equal(reads, beforeCancel, 'cancelled load starts no byte reads')
   const largeNote = 'été 😀\n'.repeat(500)
   assert.ok(Buffer.byteLength(largeNote) > 3000)
+  saveCommands = []
   assert.equal(await api.saveNoteFile('/vault/note.md', largeNote), true)
   assert.equal(files.get('/vault/note.md').toString(), largeNote)
+  // The save split into several bounded shell.exec commands that reassemble byte-identically.
+  assert.ok(saveCommands.length > 1, 'large note save must be split into multiple commands')
+  assert.ok(saveCommands.every(entry => entry.bytes <= 2400), 'every save chunk stays within the bounded size')
+  assert.equal(saveCommands.reduce((total, entry) => total + entry.bytes, 0), Buffer.byteLength(largeNote))
   tamper = true
   assert.equal(await api.saveNoteFile('/vault/note.md', 'new text'), false)
   assert.equal(files.get('/vault/note.md').toString(), largeNote, 'same-size corruption must never replace original')
