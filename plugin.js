@@ -1164,8 +1164,14 @@ async function readVaultFileBytes(path, isCancelled = function() { return false 
       binary = atob(encoded)
       if (binary.length !== expected) throw new Error('Invalid block size')
     } catch {
-      for (let part = 0; part < expected; part += 900) {
-        const length = Math.min(900, expected - part)
+      // od -An -v -tx1 emits ~4.7 characters per byte (16 bytes per line, 3 chars
+      // each, plus newlines) and shell.exec keeps only the last 4,000 characters of
+      // stdout. 900-byte blocks produce ~4,219 chars and are silently truncated, so
+      // the length check below could never pass and the fallback was dead code.
+      // 600 bytes -> ~2,813 chars, comfortably inside the cap.
+      const hexBlock = 600
+      for (let part = 0; part < expected; part += hexBlock) {
+        const length = Math.min(hexBlock, expected - part)
         const command = 'tail -c +' + (offset + part + 1) + ' ' + quotedPath + ' | head -c ' + length + ' | od -An -v -tx1'
         let hex = ''
         for (let attempt = 0; attempt < 2; attempt += 1) {

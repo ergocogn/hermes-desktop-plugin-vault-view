@@ -6,6 +6,17 @@ const vm = require('node:vm')
 const pluginPath = path.join(__dirname, '..', 'plugin.js')
 const original = fs.readFileSync(pluginPath, 'utf8')
 
+// `od -An -v -tx1` prints 16 bytes per line as 11 spaces + hex pairs joined by
+// two spaces — ~4.65 characters per byte, which is what overruns the 4,000-char
+// stdout cap for a 900-byte block.
+function odFormat(bytes) {
+  const lines = []
+  for (let i = 0; i < bytes.length; i += 16) {
+    lines.push(' '.repeat(11) + Array.from(bytes.subarray(i, i + 16), b => b.toString(16).padStart(2, '0')).join('  '))
+  }
+  return lines.length ? lines.join('\n') + '\n' : ''
+}
+
 async function readFixture(source, fixture, options = {}) {
   const commands = []
   let stats = 0
@@ -18,7 +29,7 @@ async function readFixture(source, fixture, options = {}) {
       else if (command.includes('-tx1')) {
         const start = Number(command.match(/tail -c \+(\d+)/)[1]) - 1
         const length = Number(command.match(/head -c (\d+)/)[1])
-        stdout = options.badHex ? 'truncated' : fixture.subarray(start, start + length).toString('hex')
+        stdout = options.badHex ? 'truncated' : odFormat(fixture.subarray(start, start + length))
       }
       else if (command.includes('od -An')) {
         const start = Number(command.match(/tail -c \+(\d+)/)[1]) - 1
@@ -28,7 +39,10 @@ async function readFixture(source, fixture, options = {}) {
         const length = Number(command.match(/head -c (\d+)/)[1])
         stdout = options.badBase64 ? '[REDACTED]' : fixture.subarray(start, start + length).toString('base64')
       }
-      return { result: { code: 0, stdout } }
+      // shell.exec keeps only the last 4,000 characters of stdout. Without this
+      // the double is kinder than the real channel and a hex block that cannot
+      // fit looks fine.
+      return { result: { code: 0, stdout: stdout.length > 4000 ? stdout.slice(-4000) : stdout } }
     } },
   }
   vm.runInNewContext(source.replace(/^import .*$/gm, '').replace('export default {', 'globalThis.plugin = {') + '\nglobalThis.read = readVaultFileBytes', sandbox)
@@ -49,6 +63,8 @@ async function readFixture(source, fixture, options = {}) {
     const note = Buffer.alloc(size, 0x61)
     assert.deepEqual(await readFixture(original, note), note, 'note size ' + size)
   }
+  // Hex fallback under the real 4,000-char stdout cap: a 900-byte block overran
+  // it, so every read that fell back died with FILE_READ_INCOMPLETE.
   assert.deepEqual(await readFixture(original, text, { badBase64: true }), text)
   assert.deepEqual(await readFixture(original, binary, { badBase64: true }), binary)
   const largeImage = Buffer.alloc(2 * 1024 * 1024)
