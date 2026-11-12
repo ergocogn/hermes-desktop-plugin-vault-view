@@ -1,0 +1,15 @@
+const fs = require('node:fs')
+const path = require('node:path')
+const assert = require('node:assert/strict')
+const root = path.join(__dirname, '..')
+const source = fs.readFileSync(path.join(root, 'plugin.js'), 'utf8')
+assert.match(source, /const VERSION = '0\.5\.1'/, 'requested local candidate must identify as 0.5.1')
+assert.equal(fs.readFileSync(path.join(root, 'desktop/plugin.js'), 'utf8'), source)
+assert.match(fs.readFileSync(path.join(root, 'plugin.yaml'), 'utf8'), /^version: 0\.5\.1$/m)
+for (const file of ['README.md','README.fr.md','CHAT-NOTES.md','CHANGELOG.md']) {
+  const doc = fs.readFileSync(path.join(root,file),'utf8')
+  assert.ok(doc.includes('0.5.1'), file + ' identifies the candidate')
+  assert.ok(!doc.includes('/releases/tag/v0.5.1'), 'do not invent a published release')
+}
+assert.match(source, /name: 'vault-note', render: renderTranscriptVaultNote/)
+console.log('0.5.1 candidate identity and unpublished status: OK')

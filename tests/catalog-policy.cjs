@@ -29,6 +29,11 @@ const api = sandbox.api
 api.configure()
 ;(async () => {
   assert.deepEqual(Object.keys(api.bundles.en).sort(), Object.keys(api.bundles.fr).sort(), 'complete matching locale bundles')
+  for (const language of ['en', 'fr']) {
+    assert.match(api.bundles[language].agentDisplay, /vault_view_present_note/, 'portable delivery is explicit in both locales')
+    assert.match(api.bundles[language].agentDisplay, /obsidian:\/\//, 'both locales reject misleading Obsidian links')
+    assert.match(api.bundles[language].agentPortableDelivery, /MEDIA/, 'both locales require a native file card')
+  }
   assert.equal(api.t('messageCouldNotReadTheNote'), 'Could not read the note')
   assert.equal(api.t('copyCode'), 'Copy code')
   assert.equal(api.t('quote'), 'Quote')

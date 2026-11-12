@@ -6,24 +6,42 @@
 
 [English](README.md) · [Français](README.fr.md)
 
-[![Release v0.5.0](https://img.shields.io/badge/release-v0.5.0-2563eb)](https://github.com/ergocogn/hermes-desktop-plugin-vault-view/releases/tag/v0.5.0)
+**Local candidate v0.5.1 — not a published release.**
 [![Install in Hermes Desktop](https://img.shields.io/badge/Install%20in-Hermes%20Desktop-2563eb)](hermes://plugin/install?repo=ergocogn/hermes-desktop-plugin-vault-view)
 
 ![Vault View displaying a linked Markdown note, explorer, outline, and graph inside Hermes Desktop](screenshots/vault-view-light.png)
 
 Vault View brings your Markdown knowledge base into the conversation. Find a note, ask Hermes to create or update it, follow its links, and keep several notes open in a workspace designed for a vault—not a generic file preview.
 
-## What is new in 0.5.0
+## What is new in 0.5.1 (local candidate)
 
-- Keep an optional workspace for each conversation, including its open and closed tabs, active note, navigation, editing state, previews and unsaved drafts. Pin several tabs globally when they should remain visible across conversations.
-- Quote an explicit note selection into the active Hermes conversation from reading, visual editing or Markdown source. The user action inserts a Markdown block quote and never persists the selection.
-- Create or open a note directly from a localized empty-workspace card, and keep the global Vault View toggle available even when no note is open.
-- Wrap the main and formatting toolbars at narrow container widths and align controls, menus, dialogs, focus states and empty cards with Hermes theme variables.
-- Migrate legacy tab state into versioned workspace storage without changing notes or attachments.
+- Add the public SDK `::vault-note{vault="MyVault" path="Notes/Review été.md"}` action to new assistant messages. The Markdown file card offers **Open in Vault View** and **Download**. Opening creates a fresh tab without replacing or saving another draft; downloading saves the validated source file through Hermes when its SDK download action is available.
+- Validate the configured vault, relative Markdown path, canonical containment and focused conversation; refuse stale context, missing files and escaping symlinks. No external protocol or core-policy changes.
+- Keep workspace behavior and add read-only JSON Canvas viewing. The tested Windows Desktop / Unix gateway combination supports the new file card; other native host/backend combinations remain unverified.
+- See [CHAT-NOTES.md](CHAT-NOTES.md) for activation, compatibility and native acceptance. The standard Preview/Download card serves files, not Vault View navigation, and does not repair a client/backend path mismatch.
 
-## Previous catalog review corrections in 0.4.8 and 0.4.7
+## Portable note delivery (unreleased local candidate)
 
-- Keep the plugin inside its own UI root, use public workspace APIs and preserve the direct-install entry point.
+The optional agent-side `vault_view_present_note` tool prepares an existing Markdown note as a standard Hermes `MEDIA:` file attachment when the user explicitly asks to see or download it. Android and other clients keep their normal file card. If the agent and Desktop halves are installed together as one enabled package, Vault View replaces the Desktop card with **Download** and **Open in Vault View**. A direct Desktop-only installation continues to support the older `::vault-note` action but cannot claim the tool's file card. The Desktop plugin shares its configured vault root with the agent tool through a private gateway-side file. For an agent-only install, `WIKI_PATH` remains available as a fallback. See [CHAT-NOTES.md](CHAT-NOTES.md).
+
+An `obsidian://` link is not a Hermes file attachment: Desktop may block it, and another device may resolve it to a different target. It creates neither the Vault View buttons nor native preview/download. The expected card requires the agent to emit the `MEDIA:` tag returned by the enabled tool.
+
+A `::vault-note` directive alone is a Desktop card, not a file attachment. After enabling the agent tool, use a new conversation or reload the tools in the existing one before requesting a portable file card.
+
+For portable delivery, include the returned MEDIA tag exactly once and do not add a `::vault-note` directive. Desktop already upgrades that attachment into the Vault View card; the extra directive creates a duplicate card on Desktop and raw text on other clients. Vault View does not install or modify an Obsidian skill or another extension.
+
+Explicit file delivery creates a private snapshot under Hermes's document cache, retaining the exact bytes. Its download filename contains the complete title with hyphens between words and ASCII transliteration, avoiding MEDIA clients that truncate paths at whitespace. Vault View still displays the original note name. The source note is unchanged. A unique attachment path lets Hermes identify Vault View as its producer even after another tool searched for the source note. Snapshots remain available for conversation attachments under the host cache lifecycle; notes over 32 MiB are rejected.
+
+Agent navigation commands now carry their originating conversation. If you switch conversations before a command arrives, Vault View rejects it instead of opening the note in the active conversation. Older commands without a conversation identifier are also rejected; request the note again from its original conversation.
+
+## Previous changes in 0.4.8
+
+- Keep the plugin inside its own UI root: remove Hermes transcript and tab-strip DOM access. Workspace tab selection uses the public SDK visibility atom.
+- Complete English and French labels for code copying, callouts, links, images and agent context.
+- Keep remote-image updates inside Vault View and preserve the plugin's direct-install entry point.
+
+## Previous changes in 0.4.7
+
 - SDK-sandboxed web previews, with Hermes >=0.21.5 required.
 - Separate agent navigation guidance and remote-image settings, both off by default.
 - Complete English/French errors, dialogs, bridge messages and formatting defaults.
@@ -32,7 +50,7 @@ Vault View brings your Markdown knowledge base into the conversation. Find a not
 - Faster navigation with bounded, revision-aware caches and progressive reading.
 - Live Markdown styling, source preservation, tag search and responsive sidebars.
 - Lazy image previews, a detail viewer, and image/text/code attachment previews.
-- Shared note tabs, editing undo/redo and private incident diagnostics.
+- Optional conversation-specific workspaces, pinned tabs, editing undo/redo and private incident diagnostics.
 
 Raster thumbnails use ffmpeg when available; original images remain available as a fallback. The filesystem transport requires Unix/WSL shell utilities. Direct Obsidian opening is temporarily hidden; external application opening depends on the host/backend configuration. Native Windows/macOS launch validation remains incomplete.
 
@@ -104,7 +122,7 @@ Selecting text inside a note enables the quote action in the top toolbar and add
 - Optional active-note sharing is disabled by default and sends only lightweight metadata.
 - Remote images remain blocked unless explicitly enabled; enabling them sends requests to their providers without a referrer. Explicitly opening a web link contacts its website through the SDK sandbox or external browser.
 - Navigation guidance is an independent opt-in and is localized.
-- The vault path remains in Vault View's private local plugin storage.
+- The vault path is stored in Vault View's private local plugin storage and a private gateway-side setting used by its optional delivery tool. Explicit delivery creates a retained file snapshot in the host document cache. These local data are not included in the package.
 
 The screenshots use a synthetic demonstration vault. They contain no personal path, private conversation, or real note content, and their PNG metadata has been removed.
 

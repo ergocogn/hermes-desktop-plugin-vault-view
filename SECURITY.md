@@ -1,15 +1,23 @@
-# Security
+# Security policy
 
-Security fixes are provided for the latest Vault View release.
+## Supported versions
+
+Security fixes are provided for the latest published Vault View release.
 
 ## Reporting a vulnerability
 
-Do not open a public issue. Use [GitHub private vulnerability reporting](https://github.com/ergocogn/hermes-desktop-plugin-vault-view/security/advisories/new) and include a concise description, impact, and reproduction steps using synthetic data.
+Do not open a public issue for a suspected vulnerability. Use the repository’s **Security → Advisories → Report a vulnerability** action to send a private report to the maintainers:
 
-Never attach real vault content, personal paths, environment values, credentials, tokens, or client data.
+`https://github.com/ergocogn/hermes-desktop-plugin-vault-view/security/advisories/new`
+
+Include a concise description, impact, reproduction steps, and a suggested mitigation when available. Never attach real vault contents, private paths, environment values, credentials, tokens, or client data. Use synthetic examples.
+
+The maintainers will acknowledge a complete report, investigate it privately, and coordinate disclosure and release notes when a fix is available. No security certification or formal audit is claimed.
 
 ## Security boundaries
 
-Vault View reads and writes files only in the vault selected by the user. Unexpected access outside that vault, unsafe path handling, unintended note disclosure, or unexpected network activity should be reported as security-sensitive.
+Vault View reads and writes files in the vault selected by the user. Unexpected access outside that vault, command-file injection, unsafe path resolution, unintended note-content disclosure, or unexpected external network activity should be treated as security-sensitive.
 
-Automatic detection reads only the configured `WIKI_PATH` value, not the complete environment file. The selected path stays in private local plugin storage. Runtime bridge files contain vault-relative display state, not note bodies, credentials, environment dumps, or absolute vault paths.
+Vault auto-detection is deliberately allow-listed to `WIKI_PATH`. Vault View asks the already running Hermes gateway for that single value and searches only that path and its parents for `.obsidian`; it never reads, returns, logs, or stores the rest of `.env`. The selected vault root is kept in Hermes namespaced local plugin storage, not in the plugin source or documentation.
+
+Generated `.obsidian/hermes-desktop-*.json` bridge files contain vault-relative display state only. They contain no note body, credential, environment dump, or absolute vault path. Treat them as local runtime metadata and exclude them from public vault repositories.

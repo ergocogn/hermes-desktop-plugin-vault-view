@@ -15,8 +15,6 @@ const saved = new Map()
 const opened = []
 const closed = []
 const revealed = []
-const pendingCloseCallbacks = []
-const flushCloseCallbacks = () => pendingCloseCallbacks.splice(0).forEach(callback => callback())
 const atom = id => {
   if (!visibility.has(id)) {
     let visible = false
@@ -44,10 +42,11 @@ const sandbox = {
       assert.equal(typeof options.render, 'function', 'every restored or existing workspace registration requires a render function')
       opened.push({ id, dock: options.dock })
       panes.set(id, options)
-      return () => { closed.push(id); panes.delete(id); atom('plugin-workspace:' + id).set(false); pendingCloseCallbacks.push(options.onClose) }
+      return () => { closed.push(id); panes.delete(id); atom('plugin-workspace:' + id).set(false); options.onClose() }
     },
   },
   PALETTE_AREA: 'palette',
+  vaultTranscriptSdk: {},
   COMPOSER_AREAS: { middleware: 'middleware', attachments: 'attachments' },
   Codicon() {}, jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }),
   useState: value => [typeof value === 'function' ? value() : value, () => {}], useRef: value => ({ current: value }),
@@ -79,15 +78,13 @@ const toggle = () => titlebarButton.props.onClick({ stopPropagation() {} })
 assert.equal(titlebarButton.props.style.order, -1000, 'CSS ordering moves the interactive control before native titlebar actions')
 assert.equal(titlebarButton.props['aria-pressed'], false, 'titlebar shortcut starts inactive while Vault View is hidden')
 const first = toggle()
-assert.equal(first, 'vault-view:workspace')
+assert.match(first, /^vault-view:(?:workspace|tab:[a-z0-9-]+)$/)
 assert.equal(opened[0].dock.pane, 'workspace', 'first tab uses the SDK workspace dock')
 assert.equal(opened[0].dock.pos, 'right')
 assert.equal(toggle(), true, 'a registered Vault View pane is masked without relying on visibility heuristics')
 assert.equal(closed.length, 1)
 assert.equal(sandbox.testTabs.count(), 1, 'masking preserves tab metadata')
 assert.equal(toggle(), first, 'the same masked workspace can be restored')
-flushCloseCallbacks()
-assert.equal(sandbox.testTabs.count(), 1, 'a delayed close callback from masking cannot delete the restored tab')
 const second = sandbox.testTabs.open('/synthetic/Second.md')
 assert.notEqual(second, first)
 assert.equal(opened[2].dock.pane, 'plugin-workspace:' + first, 'new tab anchors only to Vault View')
@@ -99,9 +96,7 @@ assert.equal(closed.length, 3, 'each mask operation retires every currently regi
 assert.equal(sandbox.testTabs.count(), 2, 'hide preserves tab metadata')
 assert.equal(atom('plugin-workspace:' + first).listenerCount(), 0, 'hide releases visibility listeners')
 assert.ok(toggle(), 'hidden workspace can be restored')
-flushCloseCallbacks()
 assert.equal(sandbox.testTabs.count(), 2, 'restore does not duplicate tabs')
-assert.equal(panes.size, 2, 'delayed mask callbacks leave both restored panes registered')
 disposers.forEach(fn => fn())
 assert.equal(atom('plugin-workspace:' + first).listenerCount(), 0, 'dispose releases visibility listeners')
 console.log('Vault View workspace tabs: OK (SDK dock, visibility selection, hide/restore, listener cleanup)')

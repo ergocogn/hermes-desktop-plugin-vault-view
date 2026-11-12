@@ -1,12 +1,16 @@
 name: vault-view
-version: 0.5.0
-description: Local Markdown vault workspace for Hermes Desktop.
+version: 0.5.1
+description: Local Markdown vault workspace for Hermes Desktop with optional portable note delivery.
 manifest_version: 1
 author: ergoCogn sàrl
 license: MIT
 homepage: https://github.com/ergocogn/hermes-desktop-plugin-vault-view
 kind: standalone
 capabilities: []
+provides_tools:
+  - vault_view_present_note
 requires_env: []
+optional_env:
+  - WIKI_PATH
 python_dependencies: []
 requires_hermes: ">=0.21.5"

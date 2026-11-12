@@ -6,32 +6,45 @@
 
 [English](README.md) · [Français](README.fr.md)
 
-[![Version v0.5.0](https://img.shields.io/badge/version-v0.5.0-2563eb)](https://github.com/ergocogn/hermes-desktop-plugin-vault-view/releases/tag/v0.5.0)
+**Version locale v0.5.1 — aucune release publiée.**
 [![Installer dans Hermes Desktop](https://img.shields.io/badge/Installer%20dans-Hermes%20Desktop-2563eb)](hermes://plugin/install?repo=ergocogn/hermes-desktop-plugin-vault-view)
 
 ![Vault View affichant une note Markdown liée, l’explorateur, le plan et le graphe dans Hermes Desktop](screenshots/vault-view-light.png)
 
 Vault View intègre votre base de connaissances Markdown à la conversation. Retrouvez une note, demandez à Hermes de la créer ou de la mettre à jour, suivez ses liens et gardez plusieurs notes ouvertes dans un espace conçu pour un vault plutôt que dans un simple aperçu de fichier.
 
-## Nouveautés de la version 0.5.0
+## Nouveautés de la version 0.5.1 (candidate locale)
 
-- Un workspace facultatif par conversation conserve ses onglets ouverts et fermés, sa note active, la navigation, l’état d’édition, les aperçus et les brouillons. Plusieurs onglets peuvent rester épinglés globalement entre les conversations.
-- Une sélection explicite peut être citée dans la conversation Hermes active depuis la lecture, l’éditeur visuel ou la source Markdown. Cette action insère un bloc de citation sans conserver la sélection.
-- Une carte d’espace vide permet de créer ou d’ouvrir directement une note, et le bouton global Vault View reste disponible même sans note ouverte.
-- Les barres d’outils reviennent à la ligne selon la largeur réelle du panneau et les contrôles, menus, dialogues, focus et cartes utilisent les variables du thème Hermes.
-- L’ancien état des onglets est migré vers un stockage versionné des workspaces sans modifier les notes ni les pièces jointes.
+- Action SDK publique `::vault-note{vault="MonVault" path="Notes/Revue été.md"}` dans les nouveaux messages assistant. La carte Markdown propose **Ouvrir dans Vault View** et **Télécharger**. L’ouverture crée un nouvel onglet sans remplacer ni enregistrer un autre brouillon ; le téléchargement enregistre la note source vérifiée par Hermes lorsque l’action SDK est disponible.
+- Contrôle du vault configuré, du chemin Markdown relatif, du confinement canonique et de la conversation active ; refus des changements de contexte, fichiers absents et liens symboliques sortants. Aucun changement de protocole externe ou du cœur.
+- Comportement des workspaces conservé et ajout de la lecture des documents JSON Canvas. La carte a été vérifiée avec Windows Desktop et un gateway Unix ; les autres combinaisons natives restent à vérifier.
+- Voir [CHAT-NOTES.md](CHAT-NOTES.md) pour l’activation et la recette native. La carte Preview/Télécharger sert des fichiers, pas la navigation Vault View ; elle ne corrige pas un décalage de chemin client/backend.
 
-## Corrections précédentes de la revue catalogue en 0.4.8 et 0.4.7
+## Livraison portable des notes (candidate locale non publiée)
 
-- Le plugin reste dans sa propre interface, utilise les API publiques de workspace et conserve son point d’entrée pour l’installation directe.
-- Les aperçus web utilisent le confinement du SDK et nécessitent Hermes >=0.21.5.
-- Le guidage de navigation de l’agent et les images distantes ont des réglages indépendants, tous deux désactivés par défaut.
-- Les erreurs, dialogues, messages de passerelle et valeurs de formatage sont disponibles en anglais et en français.
+L’outil facultatif `vault_view_present_note`, côté agent, prépare une note Markdown existante comme pièce jointe Hermes standard `MEDIA:` lorsque l’utilisateur demande explicitement à la voir ou à la télécharger. Android et les autres clients gardent leur carte de fichier habituelle. Si les parties agent et Desktop sont installées et activées ensemble dans un même paquet, Vault View remplace la carte Desktop par **Télécharger** et **Ouvrir dans Vault View**. L’installation directe du seul plugin Desktop conserve l’ancienne action `::vault-note`, mais ne peut pas remplacer la carte produite par l’outil. Le plugin Desktop transmet la racine du vault configuré à son outil dans un réglage privé côté gateway. `WIKI_PATH` reste un repli pour une installation agent seule. Voir [CHAT-NOTES.md](CHAT-NOTES.md).
+
+Un lien `obsidian://` n’est pas une pièce jointe Hermes : il peut être bloqué sur Desktop ou ouvrir une autre cible sur un appareil où Obsidian est configuré différemment. Il ne crée ni les boutons Vault View ni l’aperçu/téléchargement natif. La carte attendue exige que l’agent émette le tag `MEDIA:` renvoyé par l’outil activé.
+
+Pour une livraison portable, insérer le tag MEDIA renvoyé exactement une fois, sans ajouter de directive `::vault-note`. Desktop transforme déjà cette pièce jointe en carte Vault View ; une directive supplémentaire crée une deuxième carte sur Desktop et du texte brut sur les autres clients. Après activation de l’outil, ouvrir une nouvelle conversation ou recharger les outils de la conversation existante. Vault View n’installe et ne modifie aucun skill Obsidian ni autre extension.
+
+Chaque livraison explicite crée une copie privée dans le cache de documents Hermes et conserve les octets exacts. Son nom de téléchargement reprend le titre complet avec translittération ASCII et tirets entre les mots, afin d’éviter la troncature des chemins contenant des espaces. Vault View affiche toujours le nom original. La note source reste intacte. Chaque pièce jointe reçoit un chemin unique permettant à Hermes d’identifier son outil producteur. Les copies sont conservées pour la conversation selon le cycle de vie du cache hôte ; les notes dépassant 32 Mio sont refusées.
+
+Les commandes de navigation de l’agent portent désormais la conversation d’origine. Si vous changez de conversation avant leur arrivée, Vault View les refuse au lieu d’ouvrir la note dans la conversation active. Les anciennes commandes sans identifiant de conversation sont également refusées ; redemandez la note depuis sa conversation d’origine.
+
+## Changements précédents de la version 0.4.8
+
+- Le plugin reste dans sa propre interface : suppression des accès au DOM de la transcription et des onglets Hermes. La sélection des onglets utilise l’API publique de visibilité.
+- Traduction en anglais et en français des derniers libellés de copie de code, encadrés, liens, images et contexte de l’agent.
+- Mise à jour des images distantes limitée à Vault View et conservation du point d’entrée pour l’installation directe.
+
+## Changements précédents de la version 0.4.7
+
 - Lecture fiable des longues notes et enregistrement vérifié.
 - Navigation accélérée avec caches bornés et lecture progressive.
 - Mise en forme Markdown pendant l’édition, source préservée, recherche par tags et colonnes adaptatives.
 - Aperçus d’images différés, affichage en détail et aperçu des pièces jointes image/texte/code.
-- Onglets de notes partagés, annuler/rétablir et journal privé des pannes.
+- Workspaces facultatifs par conversation, onglets épinglés, annuler/rétablir et journal privé des pannes.
 
 Les miniatures utilisent ffmpeg si disponible, avec repli vers l’image originale. Le transport des fichiers nécessite des utilitaires Unix/WSL. L’ouverture directe dans Obsidian est temporairement masquée ; l’ouverture externe dépend de la configuration hôte/backend. La validation native des lancements Windows/macOS reste incomplète.
 
@@ -95,7 +108,7 @@ Utilisez le dossier indiqué par Hermes Desktop. L’application Desktop et son 
 
 Vault View recherche automatiquement le vault déjà configuré dans Hermes par `WIKI_PATH`. Si aucun vault `.obsidian` valide n’est trouvé, sélectionnez sa racine dans les paramètres.
 
-Le réglage de langue propose **Suivre Hermes Desktop**, **English** et **Français**. Le même panneau permet de restaurer les onglets, d’activer les workspaces par conversation, de réinitialiser les panneaux et d’activer facultativement le partage de métadonnées sur la note active. Les workspaces par conversation sont désactivés par défaut ; une fois activés, chaque conversation conserve ses onglets ouverts ou fermés et ses brouillons, tandis que les onglets épinglés restent visibles partout.
+Le réglage de langue propose **Suivre Hermes Desktop**, **English** et **Français**. Le même panneau permet de restaurer les onglets, d’activer les workspaces par conversation, de réinitialiser les panneaux et de régler séparément le partage de métadonnées sur la note active, les indications à l’agent et les images distantes. Les workspaces par conversation sont désactivés par défaut ; une fois activés, chaque conversation conserve ses onglets ouverts ou fermés et ses brouillons, tandis que les onglets épinglés restent visibles partout. Les options de partage et de réseau sont indépendantes et désactivées par défaut.
 
 La sélection d’un texte dans une note active l’action de citation dans la barre supérieure et ajoute **Copier la sélection** et **Citer la sélection dans la conversation** au menu contextuel de la note. La citation résulte toujours d’une action explicite, cible la conversation Hermes actuellement active et la sélection n’est jamais stockée.
 
@@ -107,7 +120,7 @@ La sélection d’un texte dans une note active l’action de citation dans la b
 - Le partage facultatif de la note active est désactivé par défaut et ne transmet que des métadonnées légères.
 - Les images distantes sont bloquées par défaut. Leur activation envoie des requêtes à leurs fournisseurs, sans référent. Ouvrir explicitement un lien web contacte son site via le composant isolé du SDK ou le navigateur externe.
 - Les indications de navigation à l’agent sont une option indépendante et traduite.
-- Le chemin du vault reste dans le stockage local privé de Vault View.
+- Le chemin du vault est conservé dans le stockage local privé de Vault View et dans un réglage privé côté gateway pour son outil de livraison facultatif. Une livraison explicite crée une copie conservée dans le cache de documents hôte. Ces données locales sont exclues du paquet.
 
 Les captures utilisent un vault de démonstration synthétique. Elles ne contiennent aucun chemin personnel, aucune conversation privée ni note réelle ; leurs métadonnées PNG ont été supprimées.
 
@@ -115,7 +128,7 @@ Les captures utilisent un vault de démonstration synthétique. Elles ne contien
 
 - Hermes Desktop >=0.21.5 avec prise en charge des Desktop Plugins
 - Vault Markdown local compatible avec Obsidian
-- Windows, macOS ou Linux, à condition que le backend Hermes actif puisse accéder au vault
+- Transport Unix Linux ou macOS. Windows Desktop peut utiliser un backend Unix hébergé dans WSL ; les gateways Windows natifs ne sont pas pris en charge par le transport POSIX.
 
 ## Support et contributions
 

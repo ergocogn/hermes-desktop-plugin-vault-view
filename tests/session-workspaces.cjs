@@ -7,6 +7,7 @@ const vm = require('node:vm')
 const source = fs.readFileSync(path.join(__dirname, '..', 'plugin.js'), 'utf8')
   .replace(/^import .*$/gm, '')
   .replace('export default {', 'globalThis.plugin = {')
+  .replace('    Promise.resolve(storageGet(STORAGE_AGENT_COMMAND_ID,', '    globalThis.testPollAgentBridge = pollAgentBridge\n    Promise.resolve(storageGet(STORAGE_AGENT_COMMAND_ID,')
 const scheduled = []
 let timerSerial = 0
 const later = (fn, delay = 0) => { const task = { id: ++timerSerial, fn, delay, cancelled: false }; scheduled.push(task); return task.id }
@@ -63,6 +64,7 @@ const sandbox = {
     },
   },
   PALETTE_AREA: 'palette', COMPOSER_AREAS: { middleware: 'middleware', attachments: 'attachments' },
+  vaultTranscriptSdk: {},
   Codicon() {}, jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }),
   useState: value => [typeof value === 'function' ? value() : value, () => {}], useRef: value => ({ current: value }), useEffect() {}, useCallback: fn => fn, useMemo: fn => fn(),
   useTheme: () => ({}), usePluginI18n: () => key => key,
@@ -73,6 +75,7 @@ globalThis.testSessions = {
   open: path => openVaultTab(path),
   mode: enabled => changeWorkspaceModeRuntime(enabled),
   activeKey: () => activeWorkspaceKey,
+  acceptsAgentCommand: sessionKey => agentCommandMatchesFocusedSession({ sessionKey }),
   tabs: () => Array.from(vaultTabs.values()).map(tab => ({ id: tab.tabId, workspaceKey: tab.workspaceKey, pinned: tab.pinned, suspended: tab.suspended, draft: tab.snapshot && tab.snapshot.rawContent })),
 }`, sandbox)
 const ctx = {
@@ -97,8 +100,25 @@ const ctx = {
   assert.ok(toggle(), 'titlebar button restores the active session workspace')
   assert.deepEqual(Array.from(panes.keys()).sort(), ['vault-view:tab:a', 'vault-view:tab:pinned'])
   assert.equal(saved.get('vault-view:session-workspaces').workspaces['profile::session:a'].open, true, 'restored state is persisted for session A')
+  assert.equal(sandbox.testSessions.acceptsAgentCommand('profile::session:a'), true, 'the active conversation can open its own note')
+  assert.equal(sandbox.testSessions.acceptsAgentCommand(''), false, 'unscoped legacy commands cannot open in an arbitrary conversation')
 
-  storedSession.set('b'); flush(150)
+  storedSession.set('b')
+  assert.equal(sandbox.testSessions.acceptsAgentCommand('profile::session:a'), false, 'switching focus immediately invalidates an A command')
+  assert.equal(sandbox.testSessions.acceptsAgentCommand('profile::session:b'), false, 'B waits until its workspace is restored')
+  flush(150)
+  assert.equal(sandbox.testSessions.acceptsAgentCommand('profile::session:a'), false, 'A cannot open a note in B')
+  assert.equal(sandbox.testSessions.acceptsAgentCommand('profile::session:b'), true, 'B can open a note in B')
+  sandbox.host.request = async () => ({ result: { stdout: JSON.stringify({ id: 'parsed-a-command', action: 'open-tab', path: 'A.md', sessionKey: 'profile::session:a' }) } })
+  assert.equal((await sandbox.readVaultAgentCommand('/synthetic')).sessionKey, 'profile::session:a', 'the bridge parses the originating session key')
+  saved.set('vault-view:vault-path', '/synthetic')
+  const bridgeResults = []
+  sandbox.readVaultAgentCommand = async () => ({ id: 'a-late-open', action: 'open-tab', path: 'A.md', sessionKey: 'profile::session:a' })
+  sandbox.writeVaultAgentResult = async (_root, command, result) => { bridgeResults.push({ command, result }); return true }
+  const panesBeforeLateCommand = Array.from(panes.keys())
+  await sandbox.testPollAgentBridge()
+  assert.deepEqual(Array.from(panes.keys()), panesBeforeLateCommand, 'late A command does not open a pane in B')
+  assert.equal(bridgeResults[0].result.ok, false, 'late A command is explicitly rejected')
   assert.deepEqual(Array.from(panes.keys()).sort(), ['vault-view:tab:b', 'vault-view:tab:pinned'], 'switching to B suspends A and restores B plus pinned tabs')
   panes.get('vault-view:tab:b').onClose()
   panes.delete('vault-view:tab:b')

@@ -8,3 +8,12 @@ Thumbs.db
 .obsidian/
 hermes-desktop-*.json
 
+# Local working analysis; exclude from public source and release assets.
+/CORRECTIONS-POST-V1.md
+
+# Installer metadata, local captures and Python caches are never release source.
+/.hermes-package.json
+/.codex-attachments/
+__pycache__/
+*.pyc
+*.pyo
