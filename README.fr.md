@@ -6,21 +6,21 @@
 
 [English](README.md) · [Français](README.fr.md)
 
-**Version locale v0.5.1 — aucune release publiée.**
+**Version v0.5.1.**
 [![Installer dans Hermes Desktop](https://img.shields.io/badge/Installer%20dans-Hermes%20Desktop-2563eb)](hermes://plugin/install?repo=ergocogn/hermes-desktop-plugin-vault-view)
 
 ![Vault View affichant une note Markdown liée, l’explorateur, le plan et le graphe dans Hermes Desktop](screenshots/vault-view-light.png)
 
 Vault View intègre votre base de connaissances Markdown à la conversation. Retrouvez une note, demandez à Hermes de la créer ou de la mettre à jour, suivez ses liens et gardez plusieurs notes ouvertes dans un espace conçu pour un vault plutôt que dans un simple aperçu de fichier.
 
-## Nouveautés de la version 0.5.1 (candidate locale)
+## Nouveautés de la version 0.5.1
 
 - Action SDK publique `::vault-note{vault="MonVault" path="Notes/Revue été.md"}` dans les nouveaux messages assistant. La carte Markdown propose **Ouvrir dans Vault View** et **Télécharger**. L’ouverture crée un nouvel onglet sans remplacer ni enregistrer un autre brouillon ; le téléchargement enregistre la note source vérifiée par Hermes lorsque l’action SDK est disponible.
 - Contrôle du vault configuré, du chemin Markdown relatif, du confinement canonique et de la conversation active ; refus des changements de contexte, fichiers absents et liens symboliques sortants. Aucun changement de protocole externe ou du cœur.
 - Comportement des workspaces conservé et ajout de la lecture des documents JSON Canvas. La carte a été vérifiée avec Windows Desktop et un gateway Unix ; les autres combinaisons natives restent à vérifier.
 - Voir [CHAT-NOTES.md](CHAT-NOTES.md) pour l’activation et la recette native. La carte Preview/Télécharger sert des fichiers, pas la navigation Vault View ; elle ne corrige pas un décalage de chemin client/backend.
 
-## Livraison portable des notes (candidate locale non publiée)
+## Livraison portable des notes
 
 L’outil facultatif `vault_view_present_note`, côté agent, prépare une note Markdown existante comme pièce jointe Hermes standard `MEDIA:` lorsque l’utilisateur demande explicitement à la voir ou à la télécharger. Android et les autres clients gardent leur carte de fichier habituelle. Si les parties agent et Desktop sont installées et activées ensemble dans un même paquet, Vault View remplace la carte Desktop par **Télécharger** et **Ouvrir dans Vault View**. L’installation directe du seul plugin Desktop conserve l’ancienne action `::vault-note`, mais ne peut pas remplacer la carte produite par l’outil. Le plugin Desktop transmet la racine du vault configuré à son outil dans un réglage privé côté gateway. `WIKI_PATH` reste un repli pour une installation agent seule. Voir [CHAT-NOTES.md](CHAT-NOTES.md).
 

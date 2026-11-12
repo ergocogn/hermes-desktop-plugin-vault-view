@@ -6,21 +6,21 @@
 
 [English](README.md) · [Français](README.fr.md)
 
-**Local candidate v0.5.1 — not a published release.**
+**Version v0.5.1.**
 [![Install in Hermes Desktop](https://img.shields.io/badge/Install%20in-Hermes%20Desktop-2563eb)](hermes://plugin/install?repo=ergocogn/hermes-desktop-plugin-vault-view)
 
 ![Vault View displaying a linked Markdown note, explorer, outline, and graph inside Hermes Desktop](screenshots/vault-view-light.png)
 
 Vault View brings your Markdown knowledge base into the conversation. Find a note, ask Hermes to create or update it, follow its links, and keep several notes open in a workspace designed for a vault—not a generic file preview.
 
-## What is new in 0.5.1 (local candidate)
+## What is new in 0.5.1
 
 - Add the public SDK `::vault-note{vault="MyVault" path="Notes/Review été.md"}` action to new assistant messages. The Markdown file card offers **Open in Vault View** and **Download**. Opening creates a fresh tab without replacing or saving another draft; downloading saves the validated source file through Hermes when its SDK download action is available.
 - Validate the configured vault, relative Markdown path, canonical containment and focused conversation; refuse stale context, missing files and escaping symlinks. No external protocol or core-policy changes.
 - Keep workspace behavior and add read-only JSON Canvas viewing. The tested Windows Desktop / Unix gateway combination supports the new file card; other native host/backend combinations remain unverified.
 - See [CHAT-NOTES.md](CHAT-NOTES.md) for activation, compatibility and native acceptance. The standard Preview/Download card serves files, not Vault View navigation, and does not repair a client/backend path mismatch.
 
-## Portable note delivery (unreleased local candidate)
+## Portable note delivery
 
 The optional agent-side `vault_view_present_note` tool prepares an existing Markdown note as a standard Hermes `MEDIA:` file attachment when the user explicitly asks to see or download it. Android and other clients keep their normal file card. If the agent and Desktop halves are installed together as one enabled package, Vault View replaces the Desktop card with **Download** and **Open in Vault View**. A direct Desktop-only installation continues to support the older `::vault-note` action but cannot claim the tool's file card. The Desktop plugin shares its configured vault root with the agent tool through a private gateway-side file. For an agent-only install, `WIKI_PATH` remains available as a fallback. See [CHAT-NOTES.md](CHAT-NOTES.md).
 

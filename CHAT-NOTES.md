@@ -1,4 +1,4 @@
-# Conversation → Vault View 0.5.1 (local candidate, not published)
+# Conversation → Vault View 0.5.1
 
 For a requested file, use `vault_view_present_note` and include its returned `media` value **exactly once**. Do not also emit `::vault-note`: Desktop already renders the attachment as a Vault View card, and clients without the plugin show the directive as raw text. The tool returns this delivery guidance in English and French; it does not modify another plugin or skill. The legacy directive below is only for Desktop-only navigation and older conversations.
 
@@ -14,7 +14,7 @@ The directive renders a compact Markdown file card with its filename and two act
 
 The action accepts only relative Markdown paths in the configured vault. Absolute paths, protocols, traversal, control characters, encoded paths and internal metadata/trash paths are refused. Existing canonical containment/stat checks also reject missing notes and symlink escapes. No external opener or protocol protection changes are introduced.
 
-Compatibility is feature-detected: requires the public SDK `TRANSCRIPT_DIRECTIVE_AREA`, directive `sessionId` and focused-session atoms, plus the existing Vault View Unix/WSL transport. On unsupported/disabled clients the directive may stay literal or refuse; use the native Vault View palette/open-tab bridge instead. Version 0.5.1 identifies this local correction; no core patch, new runtime dependency, published release/tag or settings migration is involved.
+Compatibility is feature-detected: requires the public SDK `TRANSCRIPT_DIRECTIVE_AREA`, directive `sessionId` and focused-session atoms, plus the existing Vault View Unix/WSL transport. On unsupported/disabled clients the directive may stay literal or refuse; use the native Vault View palette/open-tab bridge instead. Version 0.5.1 uses the public SDK without a core patch, new runtime dependency or settings migration.
 
 ## Client installation and activation
 
@@ -24,7 +24,7 @@ Unified packages have a `.hermes-package.json` marker and are opt-in. A fresh De
 
 The standard `::preview` and MEDIA cards are owned by the host. Vault View's card follows their presentation but does not reuse their private component or provide a native Preview action. Its download action uses the public SDK gateway save function, with the validated canonical path. The legacy directive remains the supported navigation extension for Desktop-only installs; the optional agent tool and media renderer below provide a portable file card without a core patch or protocol bypass.
 
-## Portable file delivery (unreleased local candidate)
+## Portable file delivery
 
 When the optional agent half is installed and enabled in the same unified package as the Desktop half, Vault View records its configured vault root in a private gateway-side file. `vault_view_present_note` checks an existing vault-relative `.md` path against that root and returns a canonical `MEDIA:` reference. `WIKI_PATH` remains a fallback for standalone agent installs. The agent includes that reference in its reply only when the user asked to see or download the note. Hermes then shows its ordinary file card on clients without Vault View, including Android clients that support Hermes file attachments. The Desktop SDK `TOOL_MEDIA_RENDERER_AREA` replaces that card with the two-action Vault View card only when Hermes confirms that the file came from this package's tool and the Desktop vault matches. A direct Desktop-only install or a disabled agent half keeps the native file card. The existing `::vault-note` directive remains for older chats.
 
@@ -32,7 +32,7 @@ This path requires a Unix/WSL gateway and a configured Desktop vault, or `WIKI_P
 
 An existing conversation can retain its earlier tool list after a plugin is enabled. In that case, start a new conversation or explicitly reload its tools before asking for a new file card. An old `::vault-note` reply cannot become a portable attachment retroactively.
 
-## Conversation-bound agent navigation (unreleased local correction)
+## Conversation-bound agent navigation
 
 The bridge command file is shared by the vault, so a delayed command could previously be applied after Desktop focus moved to another conversation. The draft's optional guidance now carries the originating `sessionKey`; the agent must copy it into each command. The bridge rejects missing or inactive session keys, including older unscoped commands, and checks again after asynchronous scans and before opening a tab. A rejected command returns a localized error; it can be requested again from the original conversation. The shared state file is not a source for the originating session key. This change does not mutate note contents or user attachments.
 

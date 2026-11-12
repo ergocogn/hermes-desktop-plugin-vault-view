@@ -1,35 +1,17 @@
 # Changelog
 
-## Unreleased — local correction
+## 0.5.1
 
-- Anchor note delivery reads to directory descriptors and reject symlink substitutions and non-regular files during open. Directory swaps cannot redirect a verified path outside the vault; FIFO replacement fails without blocking.
-- Emit the portable MEDIA attachment once, without an additional legacy directive. Return English/French delivery guidance from the tool itself; no external skill or extension is changed.
-- Display JSON Canvas documents in a read-only view with internal note navigation, explicit external links, zoom and viewport-based rendering.
-- Deliver a complete filename with words separated by hyphens so MEDIA clients that parse paths as one token do not truncate filenames at the first space. Vault View keeps the note's original display name.
-- Stage explicit note deliveries as private document-cache snapshots. Each attachment gets a unique path so Hermes attributes it to the delivery tool even when a search already named the original note; preserve the filename and source bytes.
-- Clarify in both agent locales and the tool schema that a `::vault-note` directive alone only renders on Desktop. A portable file card requires the agent tool's `MEDIA:` result in a new reply.
-- Use the vault root already configured in Desktop for agent-side Markdown delivery, with a private gateway-side setting and `WIKI_PATH` as an agent-only fallback. This fixes delivery when Desktop works but the gateway has no `WIKI_PATH` environment variable.
-- Clarify agent delivery guidance: a requested Markdown file must use the `MEDIA:` card produced by `vault_view_present_note`, never an `obsidian://` link that Hermes blocks or routes to an unrelated vault on another device. If the tool is unavailable, report that the file cannot be attached.
-- Bind agent bridge commands to the originating Hermes conversation. A late or unscoped open command is rejected when another conversation is active, so it cannot open a note in the wrong workspace.
-- Present `vault-note` as a compact Markdown file card matching Hermes Desktop's file-card styling, with **Open in Vault View** and **Download** actions. Download uses the public SDK gateway save action after the existing focused-chat, vault and canonical-file checks. The native Preview card remains Hermes-owned.
-- Add an optional agent-side `vault_view_present_note` tool for explicit, portable `.md` delivery through Hermes's ordinary `MEDIA:` file card. When installed as one unified package, the public tool-media renderer substitutes the Vault View card on Desktop; other clients and unavailable/disabled renderers keep their native file card. Legacy `::vault-note` messages continue to work on Desktop.
-- This correction does not change the version or publish a release.
-
-## 0.5.1 — local candidate, not published
-
-### Added
-
-- Public SDK `transcript.directives` integration for `vault-note`: a localized explicit-click action in assistant messages opens a fresh internal Vault View tab.
-- Relative Markdown path and exact configured-vault checks, canonical containment/stat validation, and focused-session/vault revalidation after asynchronous reads. Existing draft tabs are not replaced, closed or saved by this action.
-- Synthetic regression coverage for spaces/Unicode, retained drafts, traversal/protocol/metadata paths, symlink escapes, missing notes, wrong vault/chat, streaming and context changes.
-
-### Packaging and limitations
-
-- Synchronize both JavaScript entry points, manifest, version test and bilingual candidate documentation as 0.5.1. Preserve the existing local 0.5.0 workspace/selection adaptations below.
-- A unified Desktop half remains opt-in. Install into the actual client app-level root and enable it using the native Plugins switch; do not remove the package marker or edit persisted grants/decisions to force loading.
-- The integration requires a host exporting `TRANSCRIPT_DIRECTIVE_AREA`, directive session identity and focused-session atoms. Unsupported or inactive clients may display literal text. Windows loaded-file identity, SDK support and button/click acceptance must be checked separately; no native Windows success is asserted by this package.
-- The native `::preview`/MEDIA file card is not a replacement for canonical note navigation. Its file serving is scoped to the correct client/backend and an inaccessible file may report File not found.
-- No Hermes core patch, protocol relaxation, new dependency, automatic sharing, settings migration, Git push, tag, release or catalog publication.
+- Add optional agent-side Markdown delivery through standard Hermes MEDIA attachments. Desktop upgrades the card to Download / Open in Vault View; other clients retain the host's native file card.
+- Create unique private snapshots with exact source bytes and complete whitespace-safe transport filenames. Display the original note name in Vault View.
+- Use the configured Desktop vault root, with WIKI_PATH as the agent-only fallback.
+- Return English/French instructions to emit the attachment once, without an additional legacy directive or Obsidian link. No other skill or extension is modified.
+- Bind agent bridge commands to the originating conversation and reject stale context rather than opening a note in another workspace.
+- Validate relative Markdown paths, canonical containment, focused conversation and changed vault context. Anchor delivery reads to opened directory descriptors; reject directory symlink substitutions and non-regular files without blocking.
+- Keep legacy vault-note directives available for Desktop-only navigation, with a fresh-tab action that preserves other drafts.
+- Add read-only JSON Canvas viewing with confined note navigation, explicit external links, zoom and viewport-based rendering.
+- Add synthetic coverage for portable delivery, directory/FIFO races, conversation actions, retained drafts and inert Canvas content.
+- Require a Unix filesystem gateway. Optional SDK card APIs are feature-detected; unsupported or disabled renderers retain the host's native file card. See RELEASE-REVIEW.md for validation evidence and native test limitations.
 
 ## 0.5.0
 
