@@ -1,3 +1,39 @@
+# Vault View 0.5.2 — release review
+
+Review date: 2026-11-15. This section records the 0.5.2 candidate; the 0.5.1 review below is historical evidence only.
+
+## Candidate and upstream rules
+
+- Runtime JavaScript SHA-256 (both entry points): `6707364385fa7894cee6de1ab54e106e5c8f6a676b64d6f645b8d6004acd02e3`.
+- Agent entry point SHA-256 (unchanged): `45d22909f8be13ba4ee28782355c54ca8e63a987052b02922932061354b8298b`.
+- Official SDK documentation, catalog policy and entry schema, and Desktop surface lint reviewed at Hermes upstream commit `fd8a6c41ace59b476193c61002ce6a86d667b18a`.
+- The changed UI uses existing public transcript directives, tool-media renderer fallback, `host.openWorkspace`, `host.paneVisibility`, SDK localization and React. No new SDK import, platform claim, capability or minimum Hermes requirement. The manifest still requires Hermes >=0.21.5 and declares the Unix gateway platforms through the catalog entry.
+- The catalog currently pins the published 0.5.1 public commit `224c5b5ad8cef5ffd4884216d16c8481077407d8`. A catalog SHA and asset update requires a separate reviewed PR; repository publication alone does not update installs from the catalog.
+
+## Behavior and privacy review
+
+- The left toolbar button controls the explorer and the right controls the context panel. Restored tabs anchor to the conversation only when no registered Vault View pane remains, then group with that pane.
+- Deep-link cards retain Download and one localized note action: Open while its note tab is closed or masked, Hide while open. Reopening restores or focuses the existing tab without replacing a different draft. Hiding preserves tab metadata and editor snapshots.
+- Transcript and tool-media actions continue to check the focused conversation and validated vault path. Unsupported, disabled, unowned or mismatched tool results retain the native file card. No new network source or agent draft mutation was introduced.
+- Existing network inventory remains explicit external navigation, SDK SandboxedFrame for embedded pages, and remote Markdown images only after the separate persistent opt-in. Existing agent guidance remains a separate default-off opt-in; disabling either preference removes stale plugin data while preserving user attachments and note source.
+- English/French bundles cover the new action. Automatic Hermes locale and manual overrides are covered by the locale suite; note contents are not translated.
+
+## Candidate checks
+
+- `node tests/candidate-version.cjs`: passed.
+- `node tests/verify.cjs --browser` with Playwright 1.64.0 and its Chromium 1248 browser: passed, including source integrity, locale/privacy policy, workspace tabs, remote request blocking and responsive browser behavior.
+- Installed Hermes validator API `validate_plugin_dir`: all 16 checks passed, including capability probe, security scan, core override and Desktop surface; zero warnings. This is a local installed validator run, distinct from current upstream admission CI and live Desktop.
+- Installed Desktop surface lint: zero refusals and zero review cues. Manual public SDK and catalog rule review remains separate from these scanner results.
+- `git diff --check`: passed. The Desktop and catalog JavaScript entry points are byte-identical.
+
+## Checks not established by this candidate
+
+- The synthetic POSIX transcript and file-race tests, WSL integration and native Windows/macOS/Linux gateway checks were not rerun here. WSL access was denied in this environment. The earlier 0.5.1 checks do not count as 0.5.2 results.
+- No live Hermes reload, clean install, tab placement check or unsaved-draft handoff was performed for this candidate; an on-disk file does not establish the module currently loaded in Hermes. The browser and mocked SDK checks do not establish native layout behavior.
+- Public commit, tag, release assets, catalog PR and running-module version are recorded separately once verified. A maintainer merge is never inferred from a submitted PR.
+
+---
+
 # Vault View 0.5.1 — pre-publication review
 
 Review date: 2026-11-12. This is an unpublished candidate, not a security certification or a catalog admission decision.

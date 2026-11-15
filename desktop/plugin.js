@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react'
 
 const ID = 'vault-view'
 const NAME = 'Vault View'
-const VERSION = '0.5.1'
+const VERSION = '0.5.2'
 const VAULT_PATH_DEFAULT = ''
 const VAULT_ENV_KEY = 'WIKI_PATH'
 const STORAGE_VAULT_PATH = ID + ':vault-path'
@@ -24,6 +24,7 @@ const vaultActivityListeners = new Set()
 const workspacePreferenceListeners = new Set()
 let activeVaultTabId = DEFAULT_TAB_ID
 let openVaultTab = null
+let hideVaultWorkspaceAction = null
 const vaultGraphCloseListeners = new Set()
 function closeVaultGraphs() { vaultGraphCloseListeners.forEach(function(close) { close() }) }
 let changeWorkspaceModeRuntime = null
@@ -203,7 +204,7 @@ const LOCALES = {
     messageTabListWithoutOpeningAPane: "Tab list, without opening a pane.",
     messageOpenANoteInTheVaultPaneFirst: "Open a note in the vault pane first.",
     conflictTitle: 'The note changed on disk', conflictHelp: 'Your draft is retained. Compare both versions or copy your draft before reloading.', compareVersions: 'Compare versions', yourDraft: 'Your draft', diskVersion: 'Version on disk', copyDraft: 'Copy draft', reloadDisk: 'Reload from disk', keepEditing: 'Keep editing', reloadConflictConfirm: 'Replace the current draft with the latest file? Copy your changes first if needed.',
-    transcriptOpenNote: 'Open in Vault View', transcriptDownloadNote: 'Download', transcriptDownloadUnavailable: 'File download is unavailable in this Hermes version.', transcriptFocusRequired: 'Focus the conversation containing this note action, then try again.',
+    transcriptOpenNote: 'Open in Vault View', transcriptDownloadNote: 'Download', transcriptDownloadUnavailable: 'File download is unavailable in this Hermes version.', transcriptFocusRequired: 'Focus the conversation containing this note action, then try again.', hideNote: 'Hide note',
     loadMoreReading: 'Load more', showFullNote: 'Show full note', readingProgress: (count, total) => count + ' / ' + total + ' sections displayed',
     settings: 'Vault View settings', close: 'Close', vaultRoot: 'Obsidian vault root', vaultPlaceholder: '/path/to/your/vault',
     applyPath: 'Use this path',
@@ -399,7 +400,7 @@ const LOCALES = {
     messageTabListWithoutOpeningAPane: "Liste des onglets, sans ouvrir de panneau.",
     messageOpenANoteInTheVaultPaneFirst: "Ouvrez d’abord une note dans le panneau du vault.",
     conflictTitle: 'La note a changé sur disque', conflictHelp: 'Votre brouillon est conservé. Comparez les versions ou copiez votre brouillon avant de recharger.', compareVersions: 'Comparer les versions', yourDraft: 'Votre brouillon', diskVersion: 'Version sur disque', copyDraft: 'Copier le brouillon', reloadDisk: 'Recharger depuis le disque', keepEditing: 'Continuer à modifier', reloadConflictConfirm: 'Remplacer le brouillon par le fichier actuel ? Copiez vos modifications avant si nécessaire.',
-    transcriptOpenNote: 'Ouvrir dans Vault View', transcriptDownloadNote: 'Télécharger', transcriptDownloadUnavailable: 'Le téléchargement est indisponible dans cette version de Hermes.', transcriptFocusRequired: 'Activez la conversation contenant ce bouton, puis réessayez.',
+    transcriptOpenNote: 'Ouvrir dans Vault View', transcriptDownloadNote: 'Télécharger', transcriptDownloadUnavailable: 'Le téléchargement est indisponible dans cette version de Hermes.', transcriptFocusRequired: 'Activez la conversation contenant ce bouton, puis réessayez.', hideNote: 'Masquer la note',
     loadMoreReading: 'Charger la suite', showFullNote: 'Afficher toute la note', readingProgress: (count, total) => count + ' / ' + total + ' sections affichées',
     settings: 'Paramètres Vault View', close: 'Fermer', vaultRoot: 'Racine du vault Obsidian', vaultPlaceholder: '/chemin/vers/votre/vault',
     applyPath: 'Utiliser ce chemin',
@@ -1820,7 +1821,8 @@ async function actOnTranscriptVaultNote(attrs, sessionId, action) {
     if (root !== currentRoot || identity !== focusedWorkspaceIdentity() || !isFocused()) return false
     if (download) { await download(resolved[1], basename(path)); return true }
     if (typeof openVaultTab !== 'function') return false
-    // Always a fresh plugin-owned tab: never replace, close or save the active draft.
+    // Reuse an open note tab, including its unsaved draft. A different note
+    // still opens in a new plugin-owned tab instead of replacing the draft.
     return openVaultTab(path)
   } catch (error) {
     notifyError(error, t('messageNoteNotFound'))
@@ -1828,10 +1830,21 @@ async function actOnTranscriptVaultNote(attrs, sessionId, action) {
   }
 }
 
-function renderTranscriptVaultNote({ attrs, sessionId, streaming }) {
+function transcriptNoteTab(attrs, vaultPath) {
+  const relative = transcriptVaultNotePath(attrs && attrs.path)
+  const root = normalizePath(vaultPath || '').replace(/\/+$/, '')
+  if (!relative || !root || basename(root) !== attrs.vault) return null
+  const path = resolveVaultChildPath(root, relative, '')
+  return path ? Array.from(vaultTabs.values()).find(function(tab) {
+    return normalizePath(tab.path) === path && tabIsVisibleInWorkspace(tab) && !tab.suspended && typeof tab.close === 'function'
+  }) || null : null
+}
+
+function renderTranscriptVaultNote({ attrs, sessionId, streaming, vaultPath = '' }) {
   const relative = transcriptVaultNotePath(attrs && attrs.path)
   if (!relative || !attrs || typeof attrs.vault !== 'string' || !attrs.vault || attrs.vault.length > 128 || /[\x00-\x1f\x7f/\\]/.test(attrs.vault)) return null
   const target = { path: relative, vault: attrs.vault }
+  const noteOpen = Boolean(transcriptNoteTab(attrs, vaultPath))
   // Keep these classes in sync with Hermes PreviewAttachment's file card.
   const fileActionClass = 'flex shrink-0 items-center gap-1 rounded-md border border-(--ui-stroke-tertiary) bg-background/40 px-2 py-1 text-[0.7rem] font-medium text-muted-foreground transition-colors hover:bg-accent/55 hover:text-foreground disabled:opacity-50'
   const previewActionClass = 'shrink-0 rounded-md border border-(--ui-stroke-tertiary) bg-background/40 px-2 py-1 text-[0.7rem] font-medium text-muted-foreground transition-colors hover:bg-accent/55 hover:text-foreground disabled:opacity-50'
@@ -1841,9 +1854,38 @@ function renderTranscriptVaultNote({ attrs, sessionId, streaming }) {
       jsx('span', { className: 'grid size-6 shrink-0 place-items-center rounded-md bg-muted/55 text-muted-foreground/85', 'aria-hidden': true, children: jsx('svg', { className: 'size-3.5', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', children: [jsx('rect', { width: 20, height: 14, x: 2, y: 3, rx: 2 }), jsx('path', { d: 'm10 8 5 3-5 3z' }), jsx('path', { d: 'M8 21h8' }), jsx('path', { d: 'M12 17v4' })] }) }),
       jsx('span', { className: 'min-w-0 flex-1 truncate text-[0.78rem] font-medium text-foreground/90', title: relative, children: basename(relative) }),
       jsxs('button', { type: 'button', className: fileActionClass, disabled: Boolean(streaming), 'aria-label': t('transcriptDownloadNote') + ' — ' + relative, onClick: function() { return streaming ? false : actOnTranscriptVaultNote(target, sessionId, 'download') }, children: [jsx('svg', { className: 'size-3', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true, children: [jsx('path', { d: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4' }), jsx('polyline', { points: '7 10 12 15 17 10' }), jsx('line', { x1: 12, y1: 15, x2: 12, y2: 3 })] }), t('transcriptDownloadNote')] }),
-      jsx('button', { type: 'button', className: previewActionClass, disabled: Boolean(streaming), 'aria-label': t('transcriptOpenNote') + ' — ' + relative, onClick: function() { return streaming ? false : actOnTranscriptVaultNote(target, sessionId, 'open') }, children: t('transcriptOpenNote') }),
+      jsx('button', { type: 'button', className: previewActionClass, disabled: Boolean(streaming), 'aria-label': noteOpen ? t('hideNote') : t('transcriptOpenNote') + ' — ' + relative, onClick: function() {
+        if (streaming) return false
+        if (!noteOpen) return actOnTranscriptVaultNote(target, sessionId, 'open')
+        if (typeof hideVaultWorkspaceAction !== 'function' || !transcriptNoteTab(attrs, vaultPath)) return false
+        const state = host && host.state
+        if (sessionId !== readHostAtom(state && state.focusedStoredSessionId, null) && sessionId !== readHostAtom(state && state.focusedSessionId, null)) {
+          notifyError(new Error(t('transcriptFocusRequired')), NAME)
+          return false
+        }
+        return hideVaultWorkspaceAction()
+      }, children: noteOpen ? t('hideNote') : t('transcriptOpenNote') }),
     ],
   })
+}
+
+function TranscriptVaultNoteCard({ attrs, sessionId, streaming, vaultPath = '' }) {
+  const [configuredVault, setConfiguredVault] = useState(vaultPath)
+  const [, setActivity] = useState(0)
+  useEffect(function() {
+    if (vaultPath) { setConfiguredVault(vaultPath); return undefined }
+    let current = true
+    Promise.resolve(storageGet(STORAGE_VAULT_PATH, '')).then(function(root) {
+      if (current) setConfiguredVault(normalizePath(root || '').replace(/\/+$/, ''))
+    }).catch(function() { if (current) setConfiguredVault('') })
+    return function() { current = false }
+  }, [vaultPath])
+  useEffect(function() {
+    const update = function() { setActivity(function(count) { return count + 1 }) }
+    vaultActivityListeners.add(update)
+    return function() { vaultActivityListeners.delete(update) }
+  }, [])
+  return renderTranscriptVaultNote({ attrs: attrs, sessionId: sessionId, streaming: streaming, vaultPath: configuredVault })
 }
 
 function portableNoteResult(result) {
@@ -1863,12 +1905,12 @@ function VaultToolMediaCard({ file, result, sessionId, fallback }) {
   useEffect(function() {
     let current = true
     Promise.resolve(storageGet(STORAGE_VAULT_PATH, '')).then(function(root) {
-      if (current) setConfiguredVault(basename(normalizePath(root || '').replace(/\/+$/, '')))
+      if (current) setConfiguredVault(normalizePath(root || '').replace(/\/+$/, ''))
     }).catch(function() { if (current) setConfiguredVault('') })
     return function() { current = false }
   }, [])
-  if (!note || !file || file.path !== note.file || !sessionId || configuredVault !== note.vault) return fallback
-  return renderTranscriptVaultNote({ attrs: { vault: note.vault, path: note.path }, sessionId: sessionId, streaming: false }) || fallback
+  if (!note || !file || file.path !== note.file || !sessionId || basename(configuredVault) !== note.vault) return fallback
+  return jsx(TranscriptVaultNoteCard, { attrs: { vault: note.vault, path: note.path }, sessionId: sessionId, streaming: false, vaultPath: configuredVault })
 }
 
 async function loadAllNoteContents(files) {
@@ -4375,7 +4417,7 @@ function VaultTitlebarToggle({ label, onToggle, isActive }) {
   })
 }
 
-function MainPane({ tabId = DEFAULT_TAB_ID, initialPath = '', preserveEmpty = false } = {}) {
+function MainPane({ tabId = DEFAULT_TAB_ID, initialPath = '', preserveEmpty = false, onHide = null } = {}) {
   const t = useVaultI18n()
   const restoredTabSnapshot = vaultTabs.get(tabId)?.snapshot || null
   const [moveRequest, setMoveRequest] = useState(null)
@@ -5698,11 +5740,11 @@ function MainPane({ tabId = DEFAULT_TAB_ID, initialPath = '', preserveEmpty = fa
               jsx('button', {
                 className: 'ov-button ov-icon-button ov-toolbar-edge-left',
                 type: 'button',
-                onClick: function() { setRightVisible(!rightVisible) },
-                'aria-pressed': rightVisible,
-                title: rightVisible ? t('hideContext') : t('showContext'),
-                'aria-label': rightVisible ? t('hideContext') : t('showContext'),
-                children: jsx(Codicon, { name: 'layout-sidebar-right', size: '0.9rem' }),
+                onClick: function() { setLeftVisible(!leftVisible) },
+                'aria-pressed': leftVisible,
+                title: leftVisible ? t('hideExplorer') : t('showExplorer'),
+                'aria-label': leftVisible ? t('hideExplorer') : t('showExplorer'),
+                children: jsx(Codicon, { name: 'layout-sidebar-left', size: '0.9rem' }),
               }),
               jsxs('div', { className: 'ov-toolbar-group ov-toolbar-nav', role: 'group', 'aria-label': t('toolbarNavigation'), children: [useSessionWorkspaces ? jsx('button', {
                 className: 'ov-button ov-icon-button ov-pin-button' + (pinned ? ' ov-toolbar-active' : ''),
@@ -5841,12 +5883,20 @@ function MainPane({ tabId = DEFAULT_TAB_ID, initialPath = '', preserveEmpty = fa
               jsx('button', {
                 className: 'ov-button ov-icon-button ov-toolbar-edge-right',
                 type: 'button',
-                onClick: function() { setLeftVisible(!leftVisible) },
-                'aria-pressed': leftVisible,
-                title: leftVisible ? t('hideExplorer') : t('showExplorer'),
-                'aria-label': leftVisible ? t('hideExplorer') : t('showExplorer'),
-                children: jsx(Codicon, { name: 'layout-sidebar-left', size: '0.9rem' }),
+                onClick: function() { setRightVisible(!rightVisible) },
+                'aria-pressed': rightVisible,
+                title: rightVisible ? t('hideContext') : t('showContext'),
+                'aria-label': rightVisible ? t('hideContext') : t('showContext'),
+                children: jsx(Codicon, { name: 'layout-sidebar-right', size: '0.9rem' }),
               }),
+              onHide ? jsx('button', {
+                className: 'ov-button ov-icon-button',
+                type: 'button',
+                onClick: onHide,
+                title: t('hideNote'),
+                'aria-label': t('hideNote'),
+                children: jsx(Codicon, { name: 'eye-closed', size: '0.9rem' }),
+              }) : null,
             ],
           }),
           editMode ? jsx(FormattingToolbar, {
@@ -8082,6 +8132,7 @@ export default {
         host.revealPane('plugin-workspace:' + tabId)
         selectVaultTab(tabId)
         storageSet(STORAGE_WORKSPACE_OPEN, 'open')
+        vaultActivityListeners.forEach(function(listener) { listener() })
         return tabId
       }
       const tab = existing || { tabId: tabId, path: options.path || '', workspaceKey: options.workspaceKey || (sessionWorkspacesEnabled ? activeWorkspaceKey : 'global'), pinned: Boolean(options.pinned), snapshot: options.snapshot || null }
@@ -8091,7 +8142,10 @@ export default {
       tab.suspended = false
       tab.title = tab.path ? basenameNoExt(tab.path) : 'Vault View'
       const previousTab = vaultTabs.get(previousTabId)
-      const previewAnchor = previousTab && tabIsVisibleInWorkspace(previousTab) && previousTabId !== tabId ? 'plugin-workspace:' + previousTabId : ''
+      const anchorTab = previousTab && previousTabId !== tabId && tabIsVisibleInWorkspace(previousTab) && !previousTab.suspended && typeof previousTab.close === 'function'
+        ? previousTab
+        : Array.from(vaultTabs.values()).find(function(candidate) { return candidate.tabId !== tabId && tabIsVisibleInWorkspace(candidate) && !candidate.suspended && typeof candidate.close === 'function' })
+      const previewAnchor = anchorTab ? 'plugin-workspace:' + anchorTab.tabId : ''
       vaultTabs.set(tabId, tab)
       if (!tab.pinned) workspaceOpenState.set(tab.workspaceKey, true)
       // onClose may arrive after a pane disposer returns. Keep the intent on
@@ -8135,6 +8189,7 @@ export default {
             if (!tab.pinned && !Array.from(vaultTabs.values()).some(function(candidate) { return !candidate.pinned && candidate.workspaceKey === tab.workspaceKey })) workspaceOpenState.set(tab.workspaceKey, false)
             storageSet(STORAGE_WORKSPACE_OPEN, vaultTabs.size ? 'open' : 'closed')
             persistVaultTabs()
+            vaultActivityListeners.forEach(function(listener) { listener() })
             if (tab.context && tab.context.vaultPath) writeVaultAgentState(tab.context.vaultPath, '', false)
           }
           tab.close = null
@@ -8171,6 +8226,7 @@ export default {
             tabId: tabId,
             initialPath: initialPath,
             preserveEmpty: sessionWorkspacesEnabled && !normalizePath(initialPath),
+            onHide: hideVaultWorkspace,
           }, tabId)
         }),
       }
@@ -8211,6 +8267,7 @@ export default {
       }
       if (tabIsVisibleInWorkspace(tab)) selectVaultTab(tabId)
       storageSet(STORAGE_WORKSPACE_OPEN, 'open')
+      vaultActivityListeners.forEach(function(listener) { listener() })
       return tabId
     }
     function hideVaultWorkspace() {
@@ -8240,8 +8297,10 @@ export default {
       })
       storageSet(STORAGE_WORKSPACE_OPEN, 'closed')
       persistVaultTabs()
+      vaultActivityListeners.forEach(function(listener) { listener() })
       return true
     }
+    hideVaultWorkspaceAction = hideVaultWorkspace
     function restoreVaultWorkspace() {
       workspaceHidden = false
       workspaceOpenState.set(sessionWorkspacesEnabled ? activeWorkspaceKey : 'global', true)
@@ -8271,7 +8330,14 @@ export default {
         return false
       }
     }
-    openVaultTab = function(path) { return showVaultWorkspace({ newTab: true, path: path || '', workspaceKey: sessionWorkspacesEnabled ? activeWorkspaceKey : 'global' }) }
+    openVaultTab = function(path) {
+      const existing = path && Array.from(vaultTabs.values()).find(function(tab) {
+        return normalizePath(tab.path) === normalizePath(path) && tabIsVisibleInWorkspace(tab)
+      })
+      return existing
+        ? showVaultWorkspace({ tabId: existing.tabId, path: existing.path, workspaceKey: existing.workspaceKey, pinned: existing.pinned, snapshot: existing.snapshot })
+        : showVaultWorkspace({ newTab: true, path: path || '', workspaceKey: sessionWorkspacesEnabled ? activeWorkspaceKey : 'global' })
+    }
     changeWorkspaceModeRuntime = function(enabled) {
       const next = Boolean(enabled)
       if (next === sessionWorkspacesEnabled) return
@@ -8573,6 +8639,7 @@ export default {
       closeVaultGraphs()
       if (imageDetailDialog) imageDetailDialog.close()
       openVaultTab = null
+      hideVaultWorkspaceAction = null
       changeWorkspaceModeRuntime = null
       vaultTabs.forEach(function(tab) {
         if (tab.visibilityStop) { tab.visibilityStop(); tab.visibilityStop = null }
@@ -8619,7 +8686,7 @@ export default {
     })
     if (typeof vaultTranscriptSdk !== 'undefined' && typeof vaultTranscriptSdk.TRANSCRIPT_DIRECTIVE_AREA === 'string') {
       ctx.register({ id: 'transcript-note', area: vaultTranscriptSdk.TRANSCRIPT_DIRECTIVE_AREA,
-        data: { name: 'vault-note', render: renderTranscriptVaultNote } })
+        data: { name: 'vault-note', render: function(props) { return jsx(TranscriptVaultNoteCard, props) } } })
     }
     if (typeof vaultTranscriptSdk.TOOL_MEDIA_RENDERER_AREA === 'string') {
       ctx.register({ id: 'portable-note-media', area: vaultTranscriptSdk.TOOL_MEDIA_RENDERER_AREA,

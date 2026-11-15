@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.2 - 2026-11-15
+
+- Put the explorer toggle on the left and the context-panel toggle on the right.
+- Restore the first Vault View tab beside the conversation before grouping other tabs with it; avoid anchoring to a suspended pane.
+- Add a localized note action on deep-link cards that shows Open in Vault View while the note is closed or masked and Hide note while it is open. Reopening a note restores or focuses its existing tab and preserves drafts. Unsupported file cards keep the native fallback.
+
 ## 0.5.1
 
 - Add optional agent-side Markdown delivery through standard Hermes MEDIA attachments. Desktop upgrades the card to Download / Open in Vault View; other clients retain the host's native file card.

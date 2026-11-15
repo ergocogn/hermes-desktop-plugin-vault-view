@@ -83,7 +83,7 @@ assert.deepEqual(Array.from(api.filterVaultNotes(tagFiles, '/vault', '#project/p
 assert.deepEqual(Array.from(api.filterVaultNotes(tagFiles, '/vault', '#missing', tagContents)), [])
 assert.deepEqual(Array.from(api.filterVaultNotes(tagFiles, '/vault', 'project filename', tagContents)), [tagFiles[4]], 'ordinary filename search still works')
 assert.equal(api.ID, 'vault-view')
-assert.equal(api.VERSION, '0.5.1')
+assert.equal(api.VERSION, '0.5.2')
 assert.equal(api.validDetectedPath('/vault/'), '/vault')
 assert.equal(api.validDetectedPath('/vault\nsecret'), '')
 
@@ -165,6 +165,9 @@ assert.match(pluginSource, /const created = await createNoteFromRequestedPath\(e
 assert.doesNotMatch(pluginSource, /workspaceOptions\.title = title[\s\S]*?host\.openWorkspace\(tabId, workspaceOptions\)/)
 assert.match(pluginSource, /className: 'ov-toolbar-group ov-toolbar-nav'[\s\S]*?children: \[useSessionWorkspaces \? jsx\('button', \{[\s\S]*?ov-pin-button[\s\S]*?name: 'arrow-left'/)
 assert.match(pluginSource, /name: 'layout-sidebar-left'/)
+const toolbarButton = edge => pluginSource.match(new RegExp("className: 'ov-button ov-icon-button ov-toolbar-edge-" + edge + "'([\\s\\S]*?)\\n              \\}\\),"))?.[1] || ''
+assert.match(toolbarButton('left'), /setLeftVisible\(!leftVisible\)[\s\S]*?t\('hideExplorer'\)[\s\S]*?name: 'layout-sidebar-left'/, 'the left toolbar control toggles the left explorer')
+assert.match(toolbarButton('right'), /setRightVisible\(!rightVisible\)[\s\S]*?t\('hideContext'\)[\s\S]*?name: 'layout-sidebar-right'/, 'the right toolbar control toggles the right context panel')
 assert.match(pluginSource, /className: 'ov-button ov-icon-button' \+ \(editMode \? ' ov-toolbar-active' : ''\)[\s\S]*?'aria-pressed': editMode,[\s\S]*?name: 'edit'/)
 assert.doesNotMatch(pluginSource, /name: editMode \? 'book' : 'edit'/)
 assert.match(pluginSource, /onContextMenuCapture: function\(event\)[\s\S]*?setSelectionMenu\(/)

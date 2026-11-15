@@ -1,4 +1,4 @@
-# Conversation → Vault View 0.5.1
+# Conversation → Vault View 0.5.2
 
 For a requested file, use `vault_view_present_note` and include its returned `media` value **exactly once**. Do not also emit `::vault-note`: Desktop already renders the attachment as a Vault View card, and clients without the plugin show the directive as raw text. The tool returns this delivery guidance in English and French; it does not modify another plugin or skill. The legacy directive below is only for Desktop-only navigation and older conversations.
 
@@ -10,11 +10,11 @@ The supported Desktop SDK transcript action opens a Markdown note **inside Vault
 
 Emit this directive alone in an assistant-message paragraph, outside a code fence. `vault` is the exact configured vault folder name; `path` is its exact relative `.md` filename, with literal spaces/Unicode, not URL encoding. Do not use an `obsidian://` Markdown link for this internal action. Existing external links are not rewritten.
 
-The directive renders a compact Markdown file card with its filename and two actions: **Open in Vault View** and **Download**. Its spacing, colors and buttons follow the Hermes Desktop file card. A click on Open creates a **fresh Vault View tab**. Download asks Hermes to save the verified `.md` file through the public SDK gateway download action; it never modifies the source note. Neither action replaces, closes, saves or discards an existing editor draft, writes into the chat composer, or submits another agent prompt. Nothing starts during rendering/streaming. The chat containing the card must be focused; async context/vault changes abort either action. On a host without the SDK download action, Download reports that it is unavailable.
+The directive renders a compact Markdown file card with its filename, **Download**, and one note action: **Open in Vault View** while the note is closed or masked, or **Hide note** while its Vault View tab is open. Its spacing, colors and buttons follow the Hermes Desktop file card. Open selects or restores an existing tab for that note, or creates one. Download asks Hermes to save the verified `.md` file through the public SDK gateway download action; it never modifies the source note. These actions do not replace, save or discard an existing editor draft, write into the chat composer, or submit another agent prompt. Hide note hides the Vault View panes and preserves their tabs. Nothing starts during rendering/streaming. The chat containing the card must be focused; async context/vault changes abort Open and Download. On a host without the SDK download action, Download reports that it is unavailable.
 
 The action accepts only relative Markdown paths in the configured vault. Absolute paths, protocols, traversal, control characters, encoded paths and internal metadata/trash paths are refused. Existing canonical containment/stat checks also reject missing notes and symlink escapes. No external opener or protocol protection changes are introduced.
 
-Compatibility is feature-detected: requires the public SDK `TRANSCRIPT_DIRECTIVE_AREA`, directive `sessionId` and focused-session atoms, plus the existing Vault View Unix/WSL transport. On unsupported/disabled clients the directive may stay literal or refuse; use the native Vault View palette/open-tab bridge instead. Version 0.5.1 uses the public SDK without a core patch, new runtime dependency or settings migration.
+Compatibility is feature-detected: requires the public SDK `TRANSCRIPT_DIRECTIVE_AREA`, directive `sessionId` and focused-session atoms, plus the existing Vault View Unix/WSL transport. On unsupported/disabled clients the directive may stay literal or refuse; use the native Vault View palette/open-tab bridge instead. Version 0.5.2 uses the public SDK without a core patch, new runtime dependency or settings migration.
 
 ## Client installation and activation
 

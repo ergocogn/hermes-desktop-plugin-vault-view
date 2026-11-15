@@ -6,16 +6,22 @@
 
 [English](README.md) · [Français](README.fr.md)
 
-**Version v0.5.1.**
+**Version v0.5.2.**
 [![Installer dans Hermes Desktop](https://img.shields.io/badge/Installer%20dans-Hermes%20Desktop-2563eb)](hermes://plugin/install?repo=ergocogn/hermes-desktop-plugin-vault-view)
 
 ![Vault View affichant une note Markdown liée, l’explorateur, le plan et le graphe dans Hermes Desktop](screenshots/vault-view-light.png)
 
 Vault View intègre votre base de connaissances Markdown à la conversation. Retrouvez une note, demandez à Hermes de la créer ou de la mettre à jour, suivez ses liens et gardez plusieurs notes ouvertes dans un espace conçu pour un vault plutôt que dans un simple aperçu de fichier.
 
-## Nouveautés de la version 0.5.1
+## Nouveautés de la version 0.5.2
 
-- Action SDK publique `::vault-note{vault="MonVault" path="Notes/Revue été.md"}` dans les nouveaux messages assistant. La carte Markdown propose **Ouvrir dans Vault View** et **Télécharger**. L’ouverture crée un nouvel onglet sans remplacer ni enregistrer un autre brouillon ; le téléchargement enregistre la note source vérifiée par Hermes lorsque l’action SDK est disponible.
+- Placer le bouton de l’explorateur à gauche et celui du panneau contextuel à droite.
+- Restaurer Vault View à côté de la conversation sans l’ancrer à un panneau suspendu.
+- Afficher une seule action sur les cartes de lien profond : **Ouvrir dans Vault View** si la note est fermée ou masquée, **Masquer la note** si elle est ouverte. La réouverture réutilise son onglet et conserve les brouillons.
+
+## Changements précédents de la version 0.5.1
+
+- Action SDK publique `::vault-note{vault="MonVault" path="Notes/Revue été.md"}` dans les nouveaux messages assistant. La carte Markdown propose **Télécharger** et une action qui alterne entre **Ouvrir dans Vault View** et **Masquer la note**. L’ouverture sélectionne l’onglet de cette note s’il existe, ou en crée un sans remplacer ni enregistrer un autre brouillon ; le téléchargement enregistre la note source vérifiée par Hermes lorsque l’action SDK est disponible.
 - Contrôle du vault configuré, du chemin Markdown relatif, du confinement canonique et de la conversation active ; refus des changements de contexte, fichiers absents et liens symboliques sortants. Aucun changement de protocole externe ou du cœur.
 - Comportement des workspaces conservé et ajout de la lecture des documents JSON Canvas. La carte a été vérifiée avec Windows Desktop et un gateway Unix ; les autres combinaisons natives restent à vérifier.
 - Voir [CHAT-NOTES.md](CHAT-NOTES.md) pour l’activation et la recette native. La carte Preview/Télécharger sert des fichiers, pas la navigation Vault View ; elle ne corrige pas un décalage de chemin client/backend.
@@ -72,6 +78,8 @@ Voir [CHANGELOG.md](CHANGELOG.md) et le guide public de contribution pour les IA
 - Compatibilité avec les thèmes Hermes clairs et sombres
 - Interface en français, en anglais ou suivant automatiquement la langue de Hermes Desktop
 - Commandes principalement représentées par des icônes, avec libellés et infobulles traduits
+
+Le bouton de gauche affiche ou masque l’explorateur ; celui de droite commande le panneau contextuel. La carte de lien profond affiche **Ouvrir dans Vault View** quand la note est fermée ou masquée, puis **Masquer la note** au même endroit quand elle est ouverte. Le masquage conserve les onglets et les brouillons non enregistrés ; la réouverture restaure ou active l’onglet existant.
 
 ## Fonctionnement avec Hermes
 
